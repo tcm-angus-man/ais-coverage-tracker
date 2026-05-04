@@ -1,0 +1,18 @@
+# CLAUDE.local.md (example) — copy to CLAUDE.local.md (gitignored)
+
+Personal overrides and notes that should never be committed.
+
+## Local paths
+
+- Production database connection string lives in 1Password under "Cruise Globe Postgres RO".
+- Service account JSON for the Sheets workbook is at `~/secrets/cruisemaps-sheets.json`.
+
+## Personal preferences
+
+- Prefer terse summaries, no end-of-turn recap.
+- I run pnpm locally despite the repo using npm — keep both lockfiles ignored.
+
+## Notes for me, not for the team
+
+- Mon's timezone: PHT (UTC+8).
+- Assignment lead time: aim for cells assigned by Monday lunch UK time so Mon can cover the week.
