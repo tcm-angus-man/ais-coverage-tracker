@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm:*)",
+      "Bash(node:*)",
+      "Bash(tsx:*)",
+      "Bash(git diff*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git switch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git stash:*)",
+      "Bash(git restore:*)",
+      "Bash(rg:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "WebFetch(domain:vercel.com)",
+      "WebFetch(domain:nextjs.org)",
+      "WebFetch(domain:next-auth.js.org)",
+      "WebFetch(domain:authjs.dev)",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:googleapis.dev)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:tailwindcss.com)",
+      "WebFetch(domain:recharts.org)",
+      "WebFetch(domain:zod.dev)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(rm -rf*)",
+      "Bash(rm -fr*)",
+      "Bash(psql*)",
+      "Bash(pg_dump*)",
+      "Bash(pg_restore*)",
+      "Bash(vercel --prod*)",
+      "Bash(curl*production*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./.mcp.json)",
+      "Read(./service-account*.json)",
+      "Read(./tmp/**)",
+      "Read(./scratch/**)",
+      "Read(./*.snapshot.json)",
+      "Read(./mock-coverage*.json)"
+    ]
+  },
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
