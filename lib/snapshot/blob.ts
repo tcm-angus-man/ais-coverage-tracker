@@ -12,6 +12,7 @@ export async function putCoverageBlob(body: Buffer): Promise<BlobPutResult> {
   const result = await put(COVERAGE_BLOB_KEY, body, {
     access: "private",
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: "application/json",
     cacheControlMaxAge: 3600,
   });
