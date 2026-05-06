@@ -1,0 +1,3 @@
+# ais-coverage-tracker
+nternal dashboard for coordinating AIS ship data cleaning — heatmap, team assignments, and progress tracking for The Cruise Group.
+Next.js 14 internal tool for The Cruise Group's AIS coverage operation. An hourly cron snapshots Postgres voyage and silver cleaning data into a Vercel Blob; the heatmap renders 700+ ships × 10 years of ship-days with categorical coverage and cleanliness states. Assigners drag-select date ranges on the cleanliness grid to create assignments that write to Google Sheets; the team's cleaning progress is tracked on a live leaderboard. Behind Google SSO, gated to @thecruisemaps.com.
