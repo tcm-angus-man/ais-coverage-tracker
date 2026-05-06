@@ -6,9 +6,9 @@ export default withAuth({
   },
 });
 
-// Run on every route except NextAuth internals, static files, and the signin page itself
+// Run on every route except NextAuth internals, cron routes, static files, and the signin page itself
 export const config = {
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|signin).*)",
+    "/((?!api/auth|api/cron|_next/static|_next/image|favicon.ico|signin).*)",
   ],
 };
