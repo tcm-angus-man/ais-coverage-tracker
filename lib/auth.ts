@@ -42,7 +42,7 @@ export const authOptions: NextAuthOptions = {
         role:
           (token.role as "assigner" | "cleaner" | "viewer" | undefined) ??
           "viewer",
-        db_user_id: (token.db_user_id as number | null) ?? null,
+        db_user_id: (token.db_user_id as string | null | undefined) ?? null,
         display_name: (token.display_name as string | null) ?? null,
       };
       return session;

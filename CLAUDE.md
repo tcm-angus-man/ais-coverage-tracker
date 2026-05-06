@@ -67,4 +67,4 @@ Read these on tasks that touch the relevant area:
 
 ## Phase pointer
 
-Currently in **Phase 0** — scaffolding done. Next: Phase 1 (Postgres → Blob snapshot pipeline). Seven open questions in `docs/plan.md` §15 gate Phase 1.
+Currently at the start of **Phase 1** — Postgres → Blob snapshot pipeline. The seven Phase-0 push-back questions are resolved (see `docs/plan.md` "Decisions"), including the silver QA counts on `Cell` (`dt`, `dd`, `sp`, `ol`).

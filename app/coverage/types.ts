@@ -6,7 +6,6 @@ export type Ship = {
   cruise_line: string;
   imo_number: string;
   in_service: boolean;
-  imo_siblings: number[];
 };
 
 export type Cell = {
@@ -15,6 +14,10 @@ export type Cell = {
   na: number;
   dw: number;
   np: number;
+  dt: number;
+  dd: number;
+  sp: number;
+  ol: number;
 };
 
 export type CoveragePayload = {
