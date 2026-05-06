@@ -1,11 +1,7 @@
-import CoverageLoader from "./CoverageLoader";
+import CoverageShell from "./CoverageShell";
 
 export const dynamic = "force-dynamic";
 
 export default function CoveragePage() {
-  return (
-    <div className="h-[calc(100vh-44px)] w-full">
-      <CoverageLoader />
-    </div>
-  );
+  return <CoverageShell initialMode="voyage" />;
 }

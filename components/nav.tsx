@@ -2,63 +2,101 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
-const LINKS: { href: string; label: string; roles?: ("assigner" | "cleaner" | "viewer")[] }[] = [
-  { href: "/coverage", label: "coverage" },
-  { href: "/queue", label: "queue" },
-  { href: "/me", label: "me" },
-  { href: "/team", label: "team" },
+const TABS = [
+  { href: "/coverage",    label: "Coverage",    n: "01" },
+  { href: "/cleanliness", label: "Cleanliness", n: "02" },
+  { href: "/merged",      label: "Merged",      n: "03" },
+  { href: "/queue",       label: "Queue",        n: "04" },
+  { href: "/progress",   label: "Progress",     n: "05" },
 ];
 
 export default function Nav() {
-  const pathname = usePathname();
-  const { data: session, status } = useSession();
-  const role = session?.user?.role ?? "viewer";
+  const pathname = usePathname() ?? "";
+  const { data: session } = useSession();
 
   return (
-    <header className="h-11 px-3 border-b border-neutral-800 bg-neutral-900 flex items-center gap-4 text-sm">
-      <span className="font-semibold tracking-tight">ais coverage tracker</span>
-      <nav className="flex gap-1">
-        {LINKS.filter((l) => !l.roles || l.roles.includes(role)).map((l) => {
-          const active = pathname === l.href || pathname.startsWith(l.href + "/");
+    <header style={{
+      display: "flex",
+      alignItems: "stretch",
+      borderBottom: "1px solid var(--line)",
+      background: "var(--bg-2)",
+      padding: "0 36px",
+    }}>
+      {/* Wordmark */}
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", marginRight: 36, paddingRight: 36, borderRight: "1px solid var(--line)" }}>
+        <div style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--accent)", lineHeight: 1 }}>
+          AIS
+        </div>
+        <div style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 18, color: "var(--ink)", lineHeight: 1.2, marginTop: 3, letterSpacing: "-0.01em" }}>
+          Progress Tracker
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <nav style={{ display: "flex", alignItems: "stretch", flex: 1 }}>
+        {TABS.map((tab) => {
+          const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
           return (
             <Link
-              key={l.href}
-              href={l.href}
-              className={`px-2 py-1 rounded text-xs ${
-                active
-                  ? "bg-emerald-700 text-white"
-                  : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"
-              }`}
+              key={tab.href}
+              href={tab.href}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                padding: "0 18px",
+                borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+                color: active ? "var(--ink)" : "var(--ink-faint)",
+                textDecoration: "none",
+                transition: "color 0.15s, border-color 0.15s",
+                gap: 2,
+              }}
+              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.color = "var(--ink-dim)"; }}
+              onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.color = "var(--ink-faint)"; }}
             >
-              {l.label}
+              <span style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--ink-faint)", lineHeight: 1 }}>
+                {tab.n}
+              </span>
+              <span style={{
+                fontSize: 11.5,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                fontWeight: active ? 600 : 400,
+                lineHeight: 1,
+              }}>
+                {tab.label}
+              </span>
             </Link>
           );
         })}
       </nav>
-      <div className="ml-auto flex items-center gap-2 text-xs text-neutral-400">
-        {status === "loading" ? null : session?.user ? (
-          <>
-            <span className="tabular-nums">
-              {session.user.display_name ?? session.user.email} · {role}
-            </span>
-            <button
-              onClick={() => signOut()}
-              className="px-2 py-1 rounded hover:bg-neutral-800"
-            >
-              sign out
-            </button>
-          </>
-        ) : (
+
+      {/* User */}
+      {session?.user && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 24, borderLeft: "1px solid var(--line)" }}>
+          <div style={{
+            width: 26, height: 26, borderRadius: "50%",
+            background: "var(--panel)", border: "1px solid var(--line-2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 10, color: "var(--ink-dim)", fontWeight: 500, userSelect: "none",
+          }}>
+            {(session.user.display_name ?? session.user.email ?? "?")[0].toUpperCase()}
+          </div>
+          <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>
+            {session.user.display_name ?? session.user.email}
+          </span>
           <button
-            onClick={() => signIn("google")}
-            className="px-2 py-1 rounded bg-emerald-700 text-white"
+            onClick={() => signOut()}
+            style={{ fontSize: 11, color: "var(--ink-faint)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+            onMouseEnter={e => (e.currentTarget.style.color = "var(--ink-dim)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "var(--ink-faint)")}
           >
-            sign in
+            sign out
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </header>
   );
 }

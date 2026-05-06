@@ -11,15 +11,25 @@ This is the working version of the brief. Update as decisions land.
 - `/api/coverage` returns an inline 4-ship × 60-day fixture so the heatmap renders
 - Real snapshot pipeline arrives in Phase 1
 
-## Push-back questions still open (gate Phase 1)
+## Decisions (resolved 2026-05-05, gates lifted for Phase 1)
 
-1. **`Cell` fields.** `t = total prints`, `v = visible_on_globe count` confirmed in component. Canonical names for `na`, `dw`, `np`?
-2. **Universe of ships.** Filter rule for `snapshot.ships`?
-3. **Date window.** Default `SNAPSHOT_DAYS_BACK=730` — confirm.
-4. **`imo_siblings`.** Reserved on the type. Used for sister-ship grouping later?
-5. **Status `done`.** Terminal until reopened by an assigner — confirm.
-6. **Notes.** Single append-only column with `[author @ ISO]\n` prefix — confirm.
-7. **Notifications.** None in v1 — confirm.
+1. **`Cell` fields.** Refined from initial spec — see `.claude/rules/snapshot-conventions.md` for canonical definitions. Highlights:
+   - **`t`** is voyage *count* (not print count) on the voyage side; `row_count` on the silver side.
+   - **`v`** is the "reviewed/clean" subset of `t`: voyages with `visible_on_globe=TRUE` on voyage; silver days with all four anomaly counts zero on silver.
+   - **`np`** flags gap days: a day inside a ship's active voyage range with *no* voyage covering it (e.g. ship has voyages 2015-01-01 to -10 and -12 to -20 → 2015-01-11 is `np=1`).
+2. **Universe of ships.**
+   - **Voyage:** every non-river-cruise ship with an `mmsi` that has ever been requested (a voyage linked to `prints.id`). Not date-windowed.
+   - **Silver:** ships present in `silver_cells` over the silver window.
+   The `ships` array is the union.
+3. **Date window.** Two anchored windows — voyage from `2015-01-01`, silver from `2025-07-01`, both ending today. `SNAPSHOT_DAYS_BACK` is dropped.
+4. **`imo_siblings`.** Dropped from the `Ship` type.
+5. **Status `done` = reviewed.** A ship-day is `done` iff all four `silver_state` anomaly counts are zero: `delta_time_count`, `delta_distance_count`, `spike_count`, `overland_count`. Terminal in the assignment lifecycle.
+6. **Notes.** Single append-only `notes` column on the assignment row, each entry prefixed `[author @ ISO]\n`.
+7. **Notifications.** None in v1.
+
+## Phase 1 follow-ups surfaced by the above
+
+- ~~Silver QA counts on `Cell`.~~ **Resolved 2026-05-05.** Added as `dt`, `dd`, `sp`, `ol` on the `Cell` type — required ints, zero on voyage cells, real values on silver cells.
 
 ## Phase ordering
 
