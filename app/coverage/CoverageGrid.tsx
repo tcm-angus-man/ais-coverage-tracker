@@ -443,7 +443,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const r = Math.floor((cy - HEADER_H + sy) / CELL_H);
     if (c < 0 || c >= colCount || r < 0 || r >= rowCount) return null;
     return { r, c, shipIdx: baseShipIdx[r], dateIdx: activeDateOffset + c };
-  }, [colCount, rowCount, baseShipIdx, activeDateOffset]);
+  }, [colCount, rowCount, baseShipIdx, activeDateOffset, CELL_W, CELL_H]);
 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (mode !== "silver") return;
