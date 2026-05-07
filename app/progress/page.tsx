@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const C_BG        = "#0b1014";
 const C_BG2       = "#0f161c";
@@ -27,6 +26,13 @@ type Reviewer = {
   color:        string;
 };
 
+type TodayRow = {
+  user_id:         string;
+  display_name:    string;
+  count:           number;
+  last_updated_at: string;
+};
+
 type RecentRow = {
   updated_by:   string;
   display_name: string;
@@ -42,7 +48,104 @@ type ApiResponse = {
   reviewers: Omit<Reviewer, "color">[];
   totals:    { total_days: number; clean_days: number };
   recent:    RecentRow[];
+  today:     TodayRow[];
 };
+
+// ---------- bar chart with hover ----------
+type BarDatum = { date: string; total: number; breakdown: { slug: string; display_name: string; count: number; color: string }[] };
+
+function ActivityBarChart({ data, reviewers, maxBars }: { data: BarDatum[]; reviewers: Reviewer[]; maxBars: number }) {
+  const [hovered, setHovered] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const sliced = data.slice(-maxBars);
+  const maxVal = Math.max(...sliced.map(d => d.total), 1);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", height: 120, gap: 3 }}>
+        {sliced.map((d, i) => (
+          <div
+            key={d.date}
+            style={{ display: "flex", flexDirection: "column-reverse", flex: 1, cursor: "pointer", position: "relative" }}
+            onMouseEnter={e => {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setHovered({ idx: i, x: rect.left + rect.width / 2, y: rect.top });
+            }}
+            onMouseLeave={() => setHovered(null)}
+          >
+            {d.total === 0 ? (
+              <div style={{ background: C_LINE, height: 3, borderRadius: "2px 2px 0 0" }} />
+            ) : (
+              d.breakdown.map(b => {
+                const h = Math.round((b.count / maxVal) * 120);
+                return h > 0 ? (
+                  <div
+                    key={b.slug}
+                    style={{ background: b.color, height: h, minHeight: 2, transition: "opacity 0.1s" }}
+                  />
+                ) : null;
+              })
+            )}
+            <div style={{
+              fontSize: 7.5, color: C_INK_FAINT, textAlign: "center", marginTop: 4,
+              opacity: i % Math.ceil(maxBars / 7) === 0 ? 1 : 0,
+              whiteSpace: "nowrap",
+            }}>
+              {d.date.slice(5)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Hover tooltip */}
+      {hovered !== null && sliced[hovered.idx] && (
+        <div style={{
+          position: "fixed",
+          left: hovered.x,
+          top: hovered.y - 8,
+          transform: "translate(-50%, -100%)",
+          zIndex: 60,
+          background: C_PANEL,
+          border: `1px solid ${C_LINE}`,
+          borderRadius: 4,
+          padding: "8px 12px",
+          fontSize: 11,
+          color: C_INK,
+          pointerEvents: "none",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+          minWidth: 140,
+        }}>
+          <div style={{ fontVariantNumeric: "tabular-nums", color: C_INK_DIM, fontSize: 10, marginBottom: 5 }}>
+            {sliced[hovered.idx].date}
+          </div>
+          {sliced[hovered.idx].breakdown.filter(b => b.count > 0).map(b => (
+            <div key={b.slug} style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 2 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: b.color, display: "inline-block", flexShrink: 0 }} />
+                <span style={{ color: C_INK_DIM }}>{b.display_name}</span>
+              </span>
+              <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600, color: b.color }}>{b.count}</span>
+            </div>
+          ))}
+          {sliced[hovered.idx].total === 0 && <div style={{ color: C_INK_FAINT }}>No activity</div>}
+          <div style={{ borderTop: `1px solid ${C_LINE}`, marginTop: 5, paddingTop: 5, display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: C_INK_FAINT }}>Total</span>
+            <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{sliced[hovered.idx].total}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
+        {reviewers.map(r => (
+          <div key={r.slug} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: r.color }} />
+            <span style={{ fontSize: 10, color: C_INK_DIM }}>{r.display_name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ProgressPage() {
   const [data, setData]       = useState<ApiResponse | null>(null);
@@ -71,11 +174,9 @@ export default function ProgressPage() {
   function scheduleNext() {
     clearTimer();
     timerRef.current = setTimeout(() => {
-      // Only refresh when the tab is visible
       if (document.visibilityState === "visible") {
         load().then(scheduleNext);
       } else {
-        // Retry once visible
         const onVisible = () => {
           if (document.visibilityState === "visible") {
             document.removeEventListener("visibilitychange", onVisible);
@@ -104,17 +205,19 @@ export default function ProgressPage() {
   const cleanPct = data.totals.total_days === 0 ? 0 :
     Math.round((data.totals.clean_days / data.totals.total_days) * 1000) / 10;
 
+  // Build bar chart data — all dates covered by daily arrays
   const allDates = Array.from(new Set(reviewers.flatMap(r => r.daily.map(d => d.date)))).sort();
-  const areaData = allDates.map(date => {
-    const point: Record<string, string | number> = { date: date.slice(5) };
-    for (const r of reviewers) {
-      const day = r.daily.find(d => d.date === date);
-      point[r.slug] = day?.count ?? 0;
-    }
-    return point;
+  const barData: BarDatum[] = allDates.map(date => {
+    const breakdown = reviewers.map(r => ({
+      slug:         r.slug,
+      display_name: r.display_name,
+      count:        r.daily.find(d => d.date === date)?.count ?? 0,
+      color:        r.color,
+    }));
+    return { date, total: breakdown.reduce((s, b) => s + b.count, 0), breakdown };
   });
 
-  const last30 = allDates.slice(-30);
+  const todayTotal = data.today.reduce((s, r) => s + r.count, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, background: C_BG, color: C_INK, overflow: "auto" }}>
@@ -147,16 +250,14 @@ export default function ProgressPage() {
       {/* Body */}
       <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
 
-        {/* Left: leaderboard + recent */}
-        <div style={{ width: 320, borderRight: `1px solid ${C_LINE}`, flexShrink: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-
-          <div style={{ padding: "16px 20px 0" }}>
+        {/* Left: leaderboard */}
+        <div style={{ width: 300, borderRight: `1px solid ${C_LINE}`, flexShrink: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "16px 20px" }}>
             <SectionLabel>Leaderboard</SectionLabel>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-              {reviewers.map((r, i) => (
-                <div key={r.user_id} style={{ background: C_PANEL, border: `1px solid ${C_LINE}`, borderRadius: 4, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
-                  <div style={{ position: "absolute", top: 8, right: 12, fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 24, color: C_LINE, lineHeight: 1 }}>{i + 1}</div>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: r.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "#0b1014", flexShrink: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+              {reviewers.map(r => (
+                <div key={r.user_id} style={{ background: C_PANEL, border: `1px solid ${C_LINE}`, borderRadius: 4, padding: "10px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", background: r.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#0b1014", flexShrink: 0 }}>
                     {r.display_name.slice(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -170,107 +271,103 @@ export default function ProgressPage() {
                 </div>
               ))}
             </div>
-          </div>
 
-          <div style={{ padding: "20px 20px 16px", marginTop: 8 }}>
-            <SectionLabel>Recent reviews</SectionLabel>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 10 }}>
-              {data.recent.slice(0, 20).map((row, i) => {
-                const rev = reviewers.find(r => r.user_id === row.updated_by);
-                return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C_LINE}` }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: rev?.color ?? C_INK_FAINT, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: C_INK, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {row.ship_name ?? `MMSI ${row.mmsi}`}
+            {/* Recent reviews */}
+            <div style={{ marginTop: 20 }}>
+              <SectionLabel>Recent reviews</SectionLabel>
+              <div style={{ display: "flex", flexDirection: "column", marginTop: 10 }}>
+                {data.recent.slice(0, 20).map((row, i) => {
+                  const rev = reviewers.find(r => r.user_id === row.updated_by);
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C_LINE}` }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: rev?.color ?? C_INK_FAINT, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, color: C_INK, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row.ship_name ?? `MMSI ${row.mmsi}`}
+                        </div>
+                        <div style={{ fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums", marginTop: 1 }}>
+                          {row.date} · {row.display_name}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums", marginTop: 1 }}>
-                        {row.date} · {row.display_name}
+                      <div style={{ fontSize: 9.5, color: C_INK_FAINT, flexShrink: 0 }}>
+                        {row.updated_at.slice(11, 16)}
                       </div>
                     </div>
-                    <div style={{ fontSize: 9.5, color: C_INK_FAINT, flexShrink: 0 }}>
-                      {row.updated_at.slice(0, 10)}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right: charts */}
+        {/* Right: charts + today table */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", padding: "20px 36px", gap: 32 }}>
 
-          {/* 30-day stacked bar */}
+          {/* Today's breakdown table */}
           <div>
-            <SectionLabel>30-day activity</SectionLabel>
-            <div style={{ display: "flex", alignItems: "flex-end", height: 100, gap: 3, marginTop: 14 }}>
-              {last30.map((date, i) => {
-                const total = reviewers.reduce((s, r) => s + (r.daily.find(d => d.date === date)?.count ?? 0), 0);
-                return (
-                  <div key={date} style={{ display: "flex", flexDirection: "column-reverse", flex: 1 }}>
-                    {total === 0 ? (
-                      <div style={{ background: C_LINE, height: 3, borderRadius: "2px 2px 0 0" }} />
-                    ) : (
-                      reviewers.map(r => {
-                        const count = r.daily.find(d => d.date === date)?.count ?? 0;
-                        const h = Math.round((count / total) * 100);
-                        return h > 0 ? (
-                          <div key={r.slug} style={{ background: r.color, height: `${h}%`, minHeight: 2 }} />
-                        ) : null;
-                      })
-                    )}
-                    <div style={{ fontSize: 7.5, color: C_INK_FAINT, textAlign: "center", marginTop: 3, opacity: i % 5 === 0 ? 1 : 0 }}>
-                      {date.slice(5)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 10 }}>
-              {reviewers.map(r => (
-                <div key={r.slug} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 2, background: r.color }} />
-                  <span style={{ fontSize: 10, color: C_INK_DIM }}>{r.display_name}</span>
-                </div>
-              ))}
+            <SectionLabel>Today&apos;s cleaned</SectionLabel>
+            {data.today.length === 0 ? (
+              <div style={{ marginTop: 12, fontSize: 11, color: C_INK_FAINT }}>No cleaning activity yet today.</div>
+            ) : (
+              <div style={{ marginTop: 12, border: `1px solid ${C_LINE}`, borderRadius: 4, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                  <thead>
+                    <tr style={{ background: C_BG2 }}>
+                      <th style={thStyle}>Mapmaker</th>
+                      <th style={{ ...thStyle, textAlign: "right" }}>Days cleaned</th>
+                      <th style={{ ...thStyle, textAlign: "right" }}>Last update</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.today.map((row, i) => {
+                      const rev = reviewers.find(r => r.user_id === row.user_id);
+                      return (
+                        <tr key={row.user_id} style={{ background: i % 2 === 0 ? C_PANEL : "transparent", borderTop: `1px solid ${C_LINE}` }}>
+                          <td style={tdStyle}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 8, height: 8, borderRadius: "50%", background: rev?.color ?? C_INK_FAINT, flexShrink: 0 }} />
+                              {row.display_name}
+                            </div>
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: C_CLEAN, fontWeight: 600 }}>
+                            {row.count}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: C_INK_FAINT }}>
+                            {row.last_updated_at.slice(11, 16)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr style={{ borderTop: `1px solid ${C_LINE}`, background: C_BG2 }}>
+                      <td style={{ ...tdStyle, color: C_INK_FAINT, fontWeight: 500 }}>Total</td>
+                      <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: C_CLEAN }}>{todayTotal}</td>
+                      <td style={tdStyle} />
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* 7-day bar chart */}
+          <div>
+            <SectionLabel>7-day activity</SectionLabel>
+            <div style={{ marginTop: 14 }}>
+              <ActivityBarChart data={barData} reviewers={reviewers} maxBars={7} />
             </div>
           </div>
 
-          {/* Area chart */}
-          {areaData.length > 0 && (
-            <div style={{ flex: 1, minHeight: 200 }}>
-              <SectionLabel>Daily reviews (last 60 days)</SectionLabel>
-              <div style={{ marginTop: 14, height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={areaData} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-                    <defs>
-                      {reviewers.map(r => (
-                        <linearGradient key={r.slug} id={`grad-${r.slug}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor={r.color} stopOpacity={0.4} />
-                          <stop offset="95%" stopColor={r.color} stopOpacity={0} />
-                        </linearGradient>
-                      ))}
-                    </defs>
-                    <CartesianGrid vertical={false} stroke={C_LINE} />
-                    <XAxis dataKey="date" tick={{ fill: C_INK_FAINT, fontSize: 9.5, fontFamily: "JetBrains Mono, monospace" }} axisLine={false} tickLine={false} interval={6} />
-                    <YAxis tick={{ fill: C_INK_FAINT, fontSize: 9.5, fontFamily: "JetBrains Mono, monospace" }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: C_PANEL, border: `1px solid ${C_LINE}`, borderRadius: 3, fontSize: 11, color: C_INK, fontFamily: "JetBrains Mono, monospace" }}
-                      labelStyle={{ color: C_INK_DIM, marginBottom: 4 }}
-                    />
-                    {reviewers.map(r => (
-                      <Area key={r.slug} type="monotone" dataKey={r.slug} stroke={r.color} strokeWidth={1.5} fill={`url(#grad-${r.slug})`} />
-                    ))}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+          {/* 30-day bar chart */}
+          <div>
+            <SectionLabel>30-day activity</SectionLabel>
+            <div style={{ marginTop: 14 }}>
+              <ActivityBarChart data={barData} reviewers={reviewers} maxBars={30} />
             </div>
-          )}
+          </div>
 
           {reviewers.length === 0 && (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: C_INK_FAINT, fontSize: 11 }}>
-              No review activity yet — updated_by is not set on any clean silver rows.
+              No review activity yet.
             </div>
           )}
         </div>
@@ -278,6 +375,23 @@ export default function ProgressPage() {
     </div>
   );
 }
+
+const thStyle: React.CSSProperties = {
+  padding: "7px 14px",
+  textAlign: "left",
+  fontSize: 9,
+  textTransform: "uppercase",
+  letterSpacing: "0.12em",
+  color: C_INK_FAINT,
+  fontWeight: 500,
+  whiteSpace: "nowrap",
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: "8px 14px",
+  fontSize: 11,
+  color: C_INK,
+};
 
 function KpiStat({ value, label, color }: { value: string; label: string; color?: string }) {
   return (

@@ -17,7 +17,7 @@ export async function GET() {
 
     const pool = getPool();
 
-    const [reviewersRes, totalRes, recentRes, dailyRes] = await Promise.all([
+    const [reviewersRes, totalRes, recentRes, dailyRes, todayRes] = await Promise.all([
       pool.query<{ updated_by: string; days_cleaned: string; last_active: string }>(`
         SELECT
           updated_by,
@@ -81,6 +81,23 @@ export async function GET() {
         GROUP BY updated_by, date
         ORDER BY date ASC
       `),
+
+      pool.query<{ updated_by: string; count: string; last_updated_at: string }>(`
+        SELECT
+          updated_by,
+          COUNT(*)             AS count,
+          MAX(updated_at)::text AS last_updated_at
+        FROM ais_silver_summary
+        WHERE updated_by IS NOT NULL
+          AND updated_by NOT IN ('data-platform')
+          AND updated_at::date = CURRENT_DATE
+          AND delta_time_count      = 0
+          AND delta_distance_count  = 0
+          AND spike_count           = 0
+          AND overland_count        = 0
+        GROUP BY updated_by
+        ORDER BY count DESC
+      `),
     ]);
 
     const dailyByReviewer = new Map<string, { date: string; count: number }[]>();
@@ -118,7 +135,19 @@ export async function GET() {
       clean_days: Number(totalRes.rows[0]?.clean_days ?? 0),
     };
 
-    return NextResponse.json({ ok: true, reviewers, totals, recent });
+    const today = todayRes.rows
+      .filter(r => !EXCLUDED_USER_IDS.has(r.updated_by))
+      .map(r => {
+        const member = memberByUserId(r.updated_by);
+        return {
+          user_id:         r.updated_by,
+          display_name:    member?.display_name ?? `User ${r.updated_by}`,
+          count:           Number(r.count),
+          last_updated_at: r.last_updated_at,
+        };
+      });
+
+    return NextResponse.json({ ok: true, reviewers, totals, recent, today });
 
   } catch (err) {
     console.error("[/api/progress]", err);
