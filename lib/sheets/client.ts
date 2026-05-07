@@ -5,11 +5,15 @@ let _sheets: ReturnType<typeof google.sheets> | null = null;
 
 function getSheets() {
   if (_sheets) return _sheets;
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!key) throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY env var not set");
-  const creds = JSON.parse(key);
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  if (!email) throw new Error("GOOGLE_SERVICE_ACCOUNT_EMAIL env var not set");
+  if (!privateKey) throw new Error("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY env var not set");
   const auth = new google.auth.GoogleAuth({
-    credentials: creds,
+    credentials: {
+      client_email: email,
+      private_key: privateKey.replace(/\\n/g, "\n"),
+    },
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
   _sheets = google.sheets({ version: "v4", auth });
