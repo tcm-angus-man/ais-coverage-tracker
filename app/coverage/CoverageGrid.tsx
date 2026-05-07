@@ -46,24 +46,15 @@ type VoyageCellStyle = { fill: string; border: string | null };
 function voyageCellStyle(cell: Cell): VoyageCellStyle | null {
   const { t, v, na, dw } = cell;
   if (t === 0) return null;
+  const need_process = Math.max(0, t - v - na - dw);
+  const max = Math.max(v, dw, na, need_process);
+  if (max === 0) return null;
 
-  // Green fill if at least 1 voyage is visible on globe
-  const fill = v >= 1 ? C_VISIBLE : C_MISSING;
-
-  // Border: red if dw dominates visible, orange if na dominates visible
-  // Only show a problem border when the problem count exceeds visible count
-  let border: string | null = null;
-  if (dw > v) border = C_DW;
-  else if (na > v) border = C_NO_AIS;
-
-  // If nothing visible and nothing flagged, use need-process colour as fill
-  if (v === 0 && dw === 0 && na === 0) {
-    const need_process = Math.max(0, t - v - na - dw);
-    if (need_process > 0) return { fill: C_NEED_PROC, border: null };
-    return null;
-  }
-
-  return { fill, border };
+  // Dominant category determines fill
+  if (v >= max)             return { fill: C_VISIBLE,   border: null };
+  if (dw >= max)            return { fill: C_DW,        border: dw > 0 && v >= 1 ? C_VISIBLE : null };
+  if (na >= max)            return { fill: C_NO_AIS,    border: na > 0 && v >= 1 ? C_VISIBLE : null };
+  /* need_process dominates */ return { fill: C_NEED_PROC, border: need_process > 0 && v >= 1 ? C_VISIBLE : null };
 }
 
 function silverCellColor(cell: Cell): string | null {
@@ -743,11 +734,12 @@ function Legend({ mode }: { mode: ShellMode }) {
     ? [{ color: C_SILVER_OK, label: "Clean" }, { color: C_SILVER_NR, label: "Needs review" }, { color: C_MISSING, label: "No data", border: true }]
     : mode === "voyage"
       ? [
-          { color: C_VISIBLE,   label: "≥1 visible (green fill)" },
+          { color: C_VISIBLE,   label: "Visible" },
+          { color: C_DW,        label: "Details wrong" },
+          { color: C_NO_AIS,    label: "No AIS" },
           { color: C_NEED_PROC, label: "Need process" },
           { color: C_MISSING,   label: "No voyage", border: true },
-          { color: C_DW,        label: "Details wrong (red border)", borderOnly: true },
-          { color: C_NO_AIS,    label: "No AIS (orange border)", borderOnly: true },
+          { color: C_VISIBLE,   label: "+ some visible", borderOnly: true },
         ]
       : [{ color: C_VISIBLE, label: "Voyage visible" }, { color: C_SILVER_OK, label: "Silver clean" }, { color: C_SILVER_NR, label: "Silver review" }, { color: C_MISSING, label: "No data", border: true }];
   return (
