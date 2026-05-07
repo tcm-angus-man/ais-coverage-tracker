@@ -9,7 +9,7 @@ Behind Google SSO, gated to `@thecruisemaps.com`. Not customer-facing.
 - Next.js 14 App Router, TypeScript strict, Tailwind, ESLint
 - NextAuth.js (Google provider, JWT sessions)
 - Vercel: app + cron + Blob (snapshot store)
-- Postgres (read-only, hourly cron only) + Google Sheets (mutable team layer)
+- Postgres (read-only, daily cron only) + Google Sheets (mutable team layer)
 - `pg`, `googleapis`, `zod`, Recharts. No ORM.
 - Vitest. **Note:** initial scaffold used `npm`; we'd like to switch to `pnpm` once it's installed locally — drop `package-lock.json` and run `pnpm install`.
 

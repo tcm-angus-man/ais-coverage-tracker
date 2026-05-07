@@ -136,7 +136,7 @@ export default function ProgressPage() {
       {/* KPI bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 36, padding: "10px 36px", background: C_BG2, borderBottom: `1px solid ${C_LINE}`, flexShrink: 0 }}>
         <KpiStat value={data.totals.clean_days.toLocaleString()} label="Days cleaned" color={C_CLEAN} />
-        <KpiStat value={data.totals.total_days.toLocaleString()} label="Total days" />
+        <KpiStat value={data.totals.total_days.toLocaleString()} label="Total ship-days" />
         <KpiStat value={`${cleanPct}%`} label="Clean rate" color={cleanPct > 50 ? C_CLEAN : C_ACCENT} />
         <KpiStat value={String(reviewers.length)} label="Active reviewers" />
         <div style={{ marginLeft: "auto", fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums" }}>

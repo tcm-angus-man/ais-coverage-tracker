@@ -12,10 +12,15 @@ import type { Cell, CoveragePayload, Ship } from "./types";
 import type { ShellMode } from "./CoverageShell";
 import { useAssignments } from "./AssignmentContext";
 
-const CELL_W = 8;
-const CELL_H = 14;
 const HEADER_H = 36;
 const HEADER_W = 200;
+
+type Density = "compact" | "default" | "roomy";
+const DENSITY_SIZES: Record<Density, { w: number; h: number }> = {
+  compact: { w: 5,  h: 10 },
+  default: { w: 8,  h: 14 },
+  roomy:   { w: 11, h: 20 },
+};
 
 // Design tokens (hex for canvas)
 const C_BG        = "#0b1014";
@@ -107,16 +112,24 @@ function drawDiagonalCell(ctx: CanvasRenderingContext2D, x: number, y: number, w
 }
 
 // ---------- types ----------
-type SortKey = "name" | "coverage" | "activity";
+type SortKey = "name" | "coverage" | "activity" | "imo" | "cruise_line";
 
 type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: Cell; silver?: Cell } | null;
 
 type DragState = { r0: number; c0: number; r1: number; c1: number } | null;
 
 const SORT_OPTIONS: { k: SortKey; label: string }[] = [
-  { k: "name",     label: "Name A→Z" },
-  { k: "coverage", label: "Coverage %" },
-  { k: "activity", label: "Last activity" },
+  { k: "name",       label: "Name A→Z" },
+  { k: "coverage",   label: "Coverage %" },
+  { k: "activity",   label: "Last activity" },
+  { k: "imo",        label: "IMO number" },
+  { k: "cruise_line", label: "Cruise line" },
+];
+
+const DENSITY_OPTIONS: { k: Density; label: string }[] = [
+  { k: "compact", label: "Compact" },
+  { k: "default", label: "Default" },
+  { k: "roomy",   label: "Roomy" },
 ];
 
 // ---------- component ----------
@@ -139,6 +152,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const [tooltip,     setTooltip]     = useState<TooltipState>(null);
   const [drag,        setDrag]        = useState<DragState>(null);
   const [assignModal, setAssignModal] = useState<{ ship: Ship; dateStart: string; dateEnd: string } | null>(null);
+  const [density, setDensity] = useState<Density>("default");
+
+  const { w: CELL_W, h: CELL_H } = DENSITY_SIZES[density];
 
   const isSilver = mode === "silver";
   const activeDates      = isSilver ? silverDates : dates;
@@ -187,6 +203,10 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         };
         return last(b) - last(a);
       });
+    } else if (sort === "imo") {
+      idxs.sort((a, b) => ships[a].imo_number.localeCompare(ships[b].imo_number, undefined, { numeric: true }));
+    } else if (sort === "cruise_line") {
+      idxs.sort((a, b) => ships[a].cruise_line.localeCompare(ships[b].cruise_line) || ships[a].display_name.localeCompare(ships[b].display_name));
     } else {
       idxs.sort((a, b) => ships[a].display_name.localeCompare(ships[b].display_name));
     }
@@ -196,28 +216,32 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   // KPIs — filter-aware
   const kpis = useMemo(() => {
     if (isSilver) {
-      let cleanDays = 0, totalDays = 0;
+      let withData = 0, needsReview = 0, missing = 0;
       for (const si of baseShipIdx) {
         for (let di = silverDateOffset; di < dates.length; di++) {
           const cell = silver.cells[si][di];
-          if (!cell) continue;
-          totalDays++;
-          if ((cell.dt + cell.dd + cell.sp + cell.ol) === 0) cleanDays++;
+          if (!cell || cell.t === 0) { missing++; continue; }
+          withData++;
+          if ((cell.dt + cell.dd + cell.sp + cell.ol) > 0) needsReview++;
         }
       }
+      const cleanDays = withData - needsReview;
+      const totalDays = withData + missing;
       const pct = totalDays === 0 ? 0 : Math.round((cleanDays / totalDays) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: silverDates.length, pct, label: "cleaned" };
+      return { ships: baseShipIdx.length, dates: silverDates.length, pct, label: "cleaned", withData, needsReview, missing };
     } else {
-      let hit = 0, total = 0;
+      let withData = 0, needsReview = 0, missing = 0;
       for (const si of baseShipIdx) {
         for (let d = 0; d < dates.length; d++) {
-          total++;
           const cell = voyage.cells[si][d];
-          if (cell && cell.t > 0) hit++;
+          if (!cell || cell.t === 0) { missing++; continue; }
+          withData++;
+          const v = cell.v, na = cell.na, dw = cell.dw;
+          if (Math.max(0, cell.t - v - na - dw) > 0 || na > 0 || dw > 0) needsReview++;
         }
       }
-      const pct = total === 0 ? 0 : Math.round((hit / total) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: dates.length, pct, label: "covered" };
+      const pct = (withData + missing) === 0 ? 0 : Math.round((withData / (withData + missing)) * 1000) / 10;
+      return { ships: baseShipIdx.length, dates: dates.length, pct, label: "covered", withData, needsReview, missing };
     }
   }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates]);
 
@@ -445,9 +469,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", background: C_BG, color: C_INK }}>
 
       {/* KPI bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 36, padding: "10px 36px", background: C_BG2, borderBottom: `1px solid ${C_LINE}`, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 28, padding: "10px 36px", background: C_BG2, borderBottom: `1px solid ${C_LINE}`, flexShrink: 0, flexWrap: "wrap" }}>
         <KpiStat value={String(kpis.ships)} label="ships" />
-        <KpiStat value={String(kpis.dates)} label="dates" />
+        <KpiDivider />
+        <KpiStat value={kpis.withData.toLocaleString()} label="days with data" color={C_VISIBLE} />
+        <KpiStat value={kpis.needsReview.toLocaleString()} label="needs review" color={kpis.needsReview > 0 ? C_DW : C_INK_FAINT} />
+        <KpiStat value={kpis.missing.toLocaleString()} label={isSilver ? "no data" : "no voyage"} color={C_INK_FAINT} />
+        <KpiDivider />
         <KpiStat value={`${kpis.pct}%`} label={kpis.label} color={kpis.pct > 50 ? C_VISIBLE : C_DW} />
         <div style={{ marginLeft: "auto" }}><Legend mode={mode} /></div>
       </div>
@@ -482,6 +510,27 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           <input type="checkbox" checked={inServiceOnly} onChange={e => setInServiceOnly(e.target.checked)} style={{ accentColor: C_VISIBLE }} />
           In service
         </label>
+
+        <Divider />
+
+        <CtrlLabel>Density</CtrlLabel>
+        <div style={{ display: "flex", borderRadius: 2, border: `1px solid ${C_LINE}`, overflow: "hidden" }}>
+          {DENSITY_OPTIONS.map(({ k, label }) => (
+            <button
+              key={k}
+              onClick={() => setDensity(k)}
+              style={{
+                padding: "3px 9px", fontSize: 10, cursor: "pointer", fontFamily: "inherit",
+                background: density === k ? C_VISIBLE : "transparent",
+                color: density === k ? "#0b1014" : C_INK_FAINT,
+                border: "none", borderRight: k !== "roomy" ? `1px solid ${C_LINE}` : "none",
+                fontWeight: density === k ? 600 : 400,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {mode === "silver" && (
           <span style={{ fontSize: 9.5, color: C_VISIBLE, letterSpacing: "0.04em" }}>
@@ -559,6 +608,10 @@ function KpiStat({ value, label, color }: { value: string; label: string; color?
       <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.16em", color: C_INK_FAINT, marginTop: 4 }}>{label}</div>
     </div>
   );
+}
+
+function KpiDivider() {
+  return <div style={{ width: 1, height: 28, background: C_LINE, flexShrink: 0 }} />;
 }
 
 function CtrlLabel({ children }: { children: React.ReactNode }) {
@@ -685,9 +738,12 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
       left: x + 14, top: y - 8,
       transform: x > window.innerWidth - 260 ? "translateX(-110%)" : undefined,
     }}>
-      <div style={{ fontWeight: 600, marginBottom: 5 }}>
-        {ship.display_name}
-        <span style={{ fontWeight: 400, color: C_INK_DIM, marginLeft: 8, fontSize: 10 }}>{date}</span>
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontWeight: 600 }}>{ship.display_name}</div>
+        <div style={{ fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+          IMO {ship.imo_number} · MMSI {ship.mmsi}
+        </div>
+        <div style={{ fontSize: 10, color: C_INK_DIM, marginTop: 2 }}>{date}</div>
       </div>
       {(mode === "voyage" || mode === "combined") && voyage && <VoyageTooltip cell={voyage} />}
       {(mode === "silver" || mode === "combined") && silver && <SilverTooltip cell={silver} />}
