@@ -243,18 +243,21 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const pct = totalDays === 0 ? 0 : Math.round((cleanDays / totalDays) * 1000) / 10;
       return { ships: baseShipIdx.length, dates: silverDates.length, pct, label: "cleaned", withData, needsReview, missing };
     } else {
-      let withData = 0, needsReview = 0, missing = 0;
+      let withData = 0, requested = 0, needsReview = 0, missing = 0;
       for (const si of baseShipIdx) {
         for (let d = 0; d < dates.length; d++) {
           const cell = voyage.cells[si][d];
-          if (!cell || cell.t === 0) { missing++; continue; }
-          withData++;
-          const v = cell.v, na = cell.na, dw = cell.dw;
-          if (Math.max(0, cell.t - v - na - dw) > 0 || na > 0 || dw > 0) needsReview++;
+          const hasVoyage = cell && cell.t > 0;
+          const hasVisible = cell && cell.v >= 1;
+          if (!hasVisible) { missing++; } else { withData++; }
+          if (hasVoyage) { requested++; }
+          if (hasVisible && (cell.dw > cell.v || cell.na > cell.v)) needsReview++;
         }
       }
-      const pct = (withData + missing) === 0 ? 0 : Math.round((withData / (withData + missing)) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: dates.length, pct, label: "covered", withData, needsReview, missing };
+      const total = withData + missing;
+      const pct        = total     === 0 ? 0 : Math.round((withData / total)     * 1000) / 10;
+      const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
+      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested };
     }
   }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates]);
 
@@ -496,6 +499,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         <KpiStat value={kpis.missing.toLocaleString()} label={isSilver ? "no data" : "no voyage"} color={C_INK_FAINT} />
         <KpiDivider />
         <KpiStat value={`${kpis.pct}%`} label={kpis.label} color={kpis.pct > 50 ? C_VISIBLE : C_DW} />
+        {!isSilver && (
+          <KpiStat
+            value={`${kpis.requestPct}%`}
+            label="coverage / request"
+            color={(kpis.requestPct ?? 0) > 50 ? C_VISIBLE : C_DW}
+          />
+        )}
         <div style={{ marginLeft: "auto" }}><Legend mode={mode} /></div>
       </div>
 
