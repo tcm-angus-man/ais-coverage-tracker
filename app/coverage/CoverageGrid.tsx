@@ -41,16 +41,29 @@ const C_SILVER_NR = "#b8712a";
 const C_MISSING   = "#111820";
 
 // ---------- cell colour logic ----------
-function voyageCellColor(cell: Cell): string | null {
+type VoyageCellStyle = { fill: string; border: string | null };
+
+function voyageCellStyle(cell: Cell): VoyageCellStyle | null {
   const { t, v, na, dw } = cell;
   if (t === 0) return null;
-  const need_process = Math.max(0, t - v - na - dw);
-  const max = Math.max(v, dw, na, need_process);
-  if (max === 0) return null;
-  if (v >= max)    return C_VISIBLE;
-  if (dw >= max)   return C_DW;
-  if (na >= max)   return C_NO_AIS;
-  return C_NEED_PROC;
+
+  // Green fill if at least 1 voyage is visible on globe
+  const fill = v >= 1 ? C_VISIBLE : C_MISSING;
+
+  // Border: red if dw dominates visible, orange if na dominates visible
+  // Only show a problem border when the problem count exceeds visible count
+  let border: string | null = null;
+  if (dw > v) border = C_DW;
+  else if (na > v) border = C_NO_AIS;
+
+  // If nothing visible and nothing flagged, use need-process colour as fill
+  if (v === 0 && dw === 0 && na === 0) {
+    const need_process = Math.max(0, t - v - na - dw);
+    if (need_process > 0) return { fill: C_NEED_PROC, border: null };
+    return null;
+  }
+
+  return { fill, border };
 }
 
 function silverCellColor(cell: Cell): string | null {
@@ -321,8 +334,14 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
 
         if (mode === "voyage") {
           const cell = voyage.cells[shipIdx][di];
-          ctx.fillStyle = cell ? (voyageCellColor(cell) ?? C_MISSING) : C_MISSING;
+          const style = cell ? voyageCellStyle(cell) : null;
+          ctx.fillStyle = style ? style.fill : C_MISSING;
           ctx.fillRect(cx, y, cw, ch);
+          if (style?.border) {
+            ctx.strokeStyle = style.border;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cx + 0.5, y + 0.5, cw - 1, ch - 1);
+          }
         } else if (mode === "silver") {
           const cell = silver.cells[shipIdx][di];
           ctx.fillStyle = cell ? (silverCellColor(cell) ?? C_MISSING) : C_MISSING;
@@ -330,7 +349,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         } else {
           const vc = voyage.cells[shipIdx][di];
           const sc = silver.cells[shipIdx][di];
-          const vcol = vc ? voyageCellColor(vc) : null;
+          const vcol = vc ? (voyageCellStyle(vc)?.fill ?? null) : null;
           const scol = sc ? silverCellColor(sc) : null;
           if (!vcol && !scol) { ctx.fillStyle = C_MISSING; ctx.fillRect(cx, y, cw, ch); }
           else drawDiagonalCell(ctx, cx, y, cw, ch, vcol, scol);
@@ -713,16 +732,29 @@ function Legend({ mode }: { mode: ShellMode }) {
   const entries = mode === "silver"
     ? [{ color: C_SILVER_OK, label: "Clean" }, { color: C_SILVER_NR, label: "Needs review" }, { color: C_MISSING, label: "No data", border: true }]
     : mode === "voyage"
-      ? [{ color: C_VISIBLE, label: "Visible" }, { color: C_DW, label: "Details wrong" }, { color: C_NO_AIS, label: "No AIS" }, { color: C_NEED_PROC, label: "Need process" }, { color: C_MISSING, label: "No voyage", border: true }]
+      ? [
+          { color: C_VISIBLE,   label: "≥1 visible (green fill)" },
+          { color: C_NEED_PROC, label: "Need process" },
+          { color: C_MISSING,   label: "No voyage", border: true },
+          { color: C_DW,        label: "Details wrong (red border)", borderOnly: true },
+          { color: C_NO_AIS,    label: "No AIS (orange border)", borderOnly: true },
+        ]
       : [{ color: C_VISIBLE, label: "Voyage visible" }, { color: C_SILVER_OK, label: "Silver clean" }, { color: C_SILVER_NR, label: "Silver review" }, { color: C_MISSING, label: "No data", border: true }];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      {entries.map(e => (
-        <div key={e.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: e.color, border: (e as {border?: boolean}).border ? `1px solid ${C_LINE}` : undefined }} />
-          <span style={{ fontSize: 9.5, color: C_INK_FAINT }}>{e.label}</span>
-        </div>
-      ))}
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      {entries.map(e => {
+        const { borderOnly, border } = e as { borderOnly?: boolean; border?: boolean };
+        return (
+          <div key={e.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{
+              display: "inline-block", width: 9, height: 9, borderRadius: 2,
+              background: borderOnly ? "transparent" : e.color,
+              border: borderOnly ? `1.5px solid ${e.color}` : border ? `1px solid ${C_LINE}` : undefined,
+            }} />
+            <span style={{ fontSize: 9.5, color: C_INK_FAINT }}>{e.label}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

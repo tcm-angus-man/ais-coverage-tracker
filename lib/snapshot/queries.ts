@@ -122,9 +122,17 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
         COUNT(*) FILTER (
           WHERE v.route_file_location IS NULL
              OR v.globe_customer_notification = 'No data available'
+             OR EXISTS (
+               SELECT 1 FROM prints p
+               WHERE p.voyage_id = v.id AND p.is_deleted = TRUE
+             )
         )::int AS na,
         COUNT(*) FILTER (
           WHERE v.globe_customer_notification = 'Details are wrong'
+             OR EXISTS (
+               SELECT 1 FROM prints p
+               WHERE p.voyage_id = v.id AND p.is_deleted = TRUE
+             )
         )::int AS dw
       FROM voyages v
       JOIN ships s ON s.id = v.ship_id
