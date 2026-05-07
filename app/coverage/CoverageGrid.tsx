@@ -746,26 +746,23 @@ function Legend({ mode }: { mode: ShellMode }) {
     ? [{ color: C_SILVER_OK, label: "Clean" }, { color: C_SILVER_NR, label: "Needs review" }, { color: C_MISSING, label: "No data", border: true }]
     : mode === "voyage"
       ? [
-          { color: C_VISIBLE,   label: "Visible (all clean)" },
-          { color: C_VISIBLE,   label: "Visible + details wrong", borderOnly: true, borderColor: C_DW },
-          { color: C_VISIBLE,   label: "Visible + no AIS", borderOnly: true, borderColor: C_NO_AIS },
-          { color: C_VISIBLE,   label: "Visible + need process", borderOnly: true, borderColor: C_NEED_PROC },
-          { color: C_DW,        label: "Details wrong (no visible)" },
-          { color: C_NO_AIS,    label: "No AIS (no visible)" },
-          { color: C_NEED_PROC, label: "Need process (no visible)" },
+          { color: C_VISIBLE,   label: "Visible" },
+          { color: C_DW,        label: "Details wrong" },
+          { color: C_NO_AIS,    label: "No AIS" },
+          { color: C_NEED_PROC, label: "Need process" },
           { color: C_MISSING,   label: "No voyage", border: true },
         ]
       : [{ color: C_VISIBLE, label: "Voyage visible" }, { color: C_SILVER_OK, label: "Silver clean" }, { color: C_SILVER_NR, label: "Silver review" }, { color: C_MISSING, label: "No data", border: true }];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       {entries.map(e => {
-        const { borderOnly, border, borderColor } = e as { borderOnly?: boolean; border?: boolean; borderColor?: string };
+        const { border } = e as { border?: boolean };
         return (
           <div key={e.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{
               display: "inline-block", width: 9, height: 9, borderRadius: 2,
               background: e.color,
-              border: borderOnly ? `2px solid ${borderColor ?? e.color}` : border ? `1px solid ${C_LINE}` : undefined,
+              border: border ? `1px solid ${C_LINE}` : undefined,
             }} />
             <span style={{ fontSize: 9.5, color: C_INK_FAINT }}>{e.label}</span>
           </div>
