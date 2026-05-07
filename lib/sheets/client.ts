@@ -26,6 +26,13 @@ export function getSpreadsheetId(): string {
   return id;
 }
 
+export async function sheetsGet(range: string): Promise<string[][]> {
+  const sheets = getSheets();
+  const spreadsheetId = getSpreadsheetId();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+  return (res.data.values ?? []) as string[][];
+}
+
 export async function sheetsAppend(range: string, values: (string | number | null)[][]) {
   const sheets = getSheets();
   const spreadsheetId = getSpreadsheetId();
