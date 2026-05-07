@@ -17,7 +17,7 @@ export async function GET() {
 
     const pool = getPool();
 
-    const [reviewersRes, totalRes, recentRes, dailyRes, todayRes] = await Promise.all([
+    const [reviewersRes, totalRes, recentRes, dailyRes, daily30Res, todayRes] = await Promise.all([
       pool.query<{ updated_by: string; days_cleaned: string; last_active: string }>(`
         SELECT
           updated_by,
@@ -82,6 +82,23 @@ export async function GET() {
         ORDER BY date ASC
       `),
 
+      pool.query<{ updated_by: string; date: string; count: string }>(`
+        SELECT
+          updated_by,
+          updated_at::date::text AS date,
+          COUNT(updated_at)      AS count
+        FROM ais_silver_summary
+        WHERE updated_by IS NOT NULL
+          AND updated_by NOT IN ('data-platform')
+          AND updated_at::date >= CURRENT_DATE - INTERVAL '30 days'
+          AND delta_time_count      = 0
+          AND delta_distance_count  = 0
+          AND spike_count           = 0
+          AND overland_count        = 0
+        GROUP BY updated_by, updated_at::date
+        ORDER BY updated_at::date ASC
+      `),
+
       pool.query<{ updated_by: string; count: string; last_updated_at: string }>(`
         SELECT
           updated_by,
@@ -106,6 +123,12 @@ export async function GET() {
       dailyByReviewer.get(row.updated_by)!.push({ date: row.date, count: Number(row.count) });
     }
 
+    const daily30ByReviewer = new Map<string, { date: string; count: number }[]>();
+    for (const row of daily30Res.rows) {
+      if (!daily30ByReviewer.has(row.updated_by)) daily30ByReviewer.set(row.updated_by, []);
+      daily30ByReviewer.get(row.updated_by)!.push({ date: row.date, count: Number(row.count) });
+    }
+
     const reviewers = reviewersRes.rows
       .filter(r => !EXCLUDED_USER_IDS.has(r.updated_by))
       .map(r => {
@@ -117,6 +140,7 @@ export async function GET() {
           days_cleaned: Number(r.days_cleaned),
           last_active:  r.last_active,
           daily:        dailyByReviewer.get(r.updated_by) ?? [],
+          daily30:      daily30ByReviewer.get(r.updated_by) ?? [],
         };
       });
 

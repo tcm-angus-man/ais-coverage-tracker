@@ -23,6 +23,7 @@ type Reviewer = {
   days_cleaned: number;
   last_active:  string;
   daily:        { date: string; count: number }[];
+  daily30:      { date: string; count: number }[];
   color:        string;
 };
 
@@ -205,13 +206,25 @@ export default function ProgressPage() {
   const cleanPct = data.totals.total_days === 0 ? 0 :
     Math.round((data.totals.clean_days / data.totals.total_days) * 1000) / 10;
 
-  // Build bar chart data — all dates covered by daily arrays
-  const allDates = Array.from(new Set(reviewers.flatMap(r => r.daily.map(d => d.date)))).sort();
-  const barData: BarDatum[] = allDates.map(date => {
+  // 7-day chart: grouped by silver data date (which ship-day was cleaned)
+  const allDates7 = Array.from(new Set(reviewers.flatMap(r => r.daily.map(d => d.date)))).sort();
+  const barData7: BarDatum[] = allDates7.map(date => {
     const breakdown = reviewers.map(r => ({
       slug:         r.slug,
       display_name: r.display_name,
       count:        r.daily.find(d => d.date === date)?.count ?? 0,
+      color:        r.color,
+    }));
+    return { date, total: breakdown.reduce((s, b) => s + b.count, 0), breakdown };
+  });
+
+  // 30-day chart: grouped by updated_at date (the day the cleaning was done)
+  const allDates30 = Array.from(new Set(reviewers.flatMap(r => r.daily30.map(d => d.date)))).sort();
+  const barData30: BarDatum[] = allDates30.map(date => {
+    const breakdown = reviewers.map(r => ({
+      slug:         r.slug,
+      display_name: r.display_name,
+      count:        r.daily30.find(d => d.date === date)?.count ?? 0,
       color:        r.color,
     }));
     return { date, total: breakdown.reduce((s, b) => s + b.count, 0), breakdown };
@@ -349,20 +362,22 @@ export default function ProgressPage() {
             )}
           </div>
 
-          {/* 7-day bar chart */}
+          {/* 7-day bar chart — by silver data date (which ship-days were cleaned) */}
           <div>
-            <SectionLabel>7-day activity</SectionLabel>
-            <div style={{ marginTop: 14 }}>
-              <ActivityBarChart data={barData} reviewers={reviewers} maxBars={7} />
+            <SectionLabel>Last 7 days — ship-days cleaned</SectionLabel>
+            <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, marginBottom: 14 }}>
+              Grouped by the silver data date (which day of data was cleaned)
             </div>
+            <ActivityBarChart data={barData7} reviewers={reviewers} maxBars={7} />
           </div>
 
-          {/* 30-day bar chart */}
+          {/* 30-day bar chart — by updated_at date (when the cleaning was done) */}
           <div>
-            <SectionLabel>30-day activity</SectionLabel>
-            <div style={{ marginTop: 14 }}>
-              <ActivityBarChart data={barData} reviewers={reviewers} maxBars={30} />
+            <SectionLabel>Last 30 days — cleaning activity</SectionLabel>
+            <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, marginBottom: 14 }}>
+              Grouped by when each mapmaker actually did the cleaning
             </div>
+            <ActivityBarChart data={barData30} reviewers={reviewers} maxBars={30} />
           </div>
 
           {reviewers.length === 0 && (
