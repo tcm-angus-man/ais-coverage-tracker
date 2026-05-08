@@ -8,9 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSession } from "next-auth/react";
 import type { Cell, CoveragePayload, Ship } from "./types";
 import type { ShellMode } from "./CoverageShell";
 import { useAssignments } from "./AssignmentContext";
+
+// Cleaners who work live-data — highlighted in the assignee picker
+const LIVE_DATA_TEAM = new Set(["nick", "ai-ai", "kim"]);
 
 const HEADER_H = 36;
 const HEADER_W = 200;
@@ -153,6 +157,8 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const indexed = useMemo(() => indexPayload(payload), [payload]);
   const { ships, dates, silverDates, silverDateOffset, voyage, silver, silverShipSet, cruiseLineList } = indexed;
   const { addDraft } = useAssignments();
+  const { data: session } = useSession();
+  const isAssigner = session?.user?.role === "assigner";
 
   const scrollRef    = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
@@ -446,12 +452,12 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   }, [colCount, rowCount, baseShipIdx, activeDateOffset, CELL_W, CELL_H]);
 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (mode !== "silver") return;
+    if (mode !== "silver" || !isAssigner) return;
     const hit = hitTest(e);
     if (!hit) return;
     isDragging.current = true;
     setDrag({ r0: hit.r, c0: hit.c, r1: hit.r, c1: hit.c });
-  }, [mode, hitTest]);
+  }, [mode, hitTest, isAssigner]);
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const hit = hitTest(e);
@@ -468,7 +474,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   }, [hitTest, ships, dates, payload, mode]);
 
   const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging.current || !drag || mode !== "silver") { isDragging.current = false; return; }
+    if (!isDragging.current || !drag || mode !== "silver" || !isAssigner) { isDragging.current = false; return; }
     isDragging.current = false;
     const r0 = Math.min(drag.r0, drag.r1), r1 = Math.max(drag.r0, drag.r1);
     const c0 = Math.min(drag.c0, drag.c1), c1 = Math.max(drag.c0, drag.c1);
@@ -483,7 +489,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     }
     setDrag(null);
     void e;
-  }, [drag, mode, baseShipIdx, ships, activeDates]);
+  }, [drag, mode, isAssigner, baseShipIdx, ships, activeDates]);
 
   const onMouseLeave = useCallback(() => {
     setTooltip(null);
@@ -829,20 +835,21 @@ function SilverTooltip({ cell }: { cell: Cell }) {
   );
 }
 
+// All cleaners — live-data team first, then rest (client-safe, no server-only import needed)
 const ASSIGNABLE_MEMBERS = [
-  { slug: "bea",     display_name: "Bea" },
-  { slug: "ronnel",  display_name: "Ronnel" },
-  { slug: "kaye",    display_name: "Kaye" },
-  { slug: "coleen",  display_name: "Coleen" },
-  { slug: "kim",     display_name: "Kim" },
   { slug: "nick",    display_name: "Nick" },
-  { slug: "nicole",  display_name: "Nicole" },
-  { slug: "jayziel", display_name: "Jayziel" },
-  { slug: "ai-ai",   display_name: "Ai-ai" },
-  { slug: "rome",    display_name: "Rome" },
-  { slug: "dave",    display_name: "Dave" },
-  { slug: "jen",     display_name: "Jen" },
-  { slug: "jovi",    display_name: "Jovi" },
+  { slug: "ai-ai",  display_name: "Ai-ai" },
+  { slug: "kim",    display_name: "Kim" },
+  { slug: "bea",    display_name: "Bea" },
+  { slug: "ronnel", display_name: "Ronnel" },
+  { slug: "kaye",   display_name: "Kaye" },
+  { slug: "coleen", display_name: "Coleen" },
+  { slug: "nicole", display_name: "Nicole" },
+  { slug: "jayziel",display_name: "Jayziel" },
+  { slug: "rome",   display_name: "Rome" },
+  { slug: "dave",   display_name: "Dave" },
+  { slug: "jen",    display_name: "Jen" },
+  { slug: "jovi",   display_name: "Jovi" },
 ];
 
 function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
@@ -869,9 +876,16 @@ function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
             style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
           >
             <option value="" disabled>Select team member…</option>
-            {ASSIGNABLE_MEMBERS.map(m => (
-              <option key={m.slug} value={m.slug}>{m.display_name}</option>
-            ))}
+            <optgroup label="Live-data team">
+              {ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug)).map(m => (
+                <option key={m.slug} value={m.slug}>{m.display_name} ★</option>
+              ))}
+            </optgroup>
+            <optgroup label="Other cleaners">
+              {ASSIGNABLE_MEMBERS.filter(m => !LIVE_DATA_TEAM.has(m.slug)).map(m => (
+                <option key={m.slug} value={m.slug}>{m.display_name}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

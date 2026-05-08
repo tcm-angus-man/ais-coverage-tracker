@@ -44,3 +44,15 @@ export async function sheetsAppend(range: string, values: (string | number | nul
     requestBody: { values },
   });
 }
+
+// Update a single row by absolute A1 range (e.g. "assignments!A5:M5")
+export async function sheetsUpdateRow(range: string, values: (string | number | null)[]) {
+  const sheets = getSheets();
+  const spreadsheetId = getSpreadsheetId();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [values] },
+  });
+}
