@@ -71,11 +71,19 @@ export async function POST(req: Request) {
       JSON.stringify({ assignee: d.assignee, date_start: d.date_start, date_end: d.date_end }),
     ];
 
-    // Fire both appends in parallel; audit failure doesn't fail the request
-    const [, auditResult] = await Promise.allSettled([
+    // Assignment write must succeed; audit failure is best-effort
+    const [assignResult, auditResult] = await Promise.allSettled([
       sheetsAppend("assignments!A:M", [assignmentRow]),
       sheetsAppend("audit_log!A:G",   [auditRow]),
     ]);
+
+    if (assignResult.status === "rejected") {
+      console.error("[/api/sheets/assignments] assignment append failed:", assignResult.reason);
+      return NextResponse.json(
+        { ok: false, error: assignResult.reason instanceof Error ? assignResult.reason.message : String(assignResult.reason) },
+        { status: 500 },
+      );
+    }
 
     if (auditResult.status === "rejected") {
       console.error("[/api/sheets/assignments] audit append failed:", auditResult.reason);
