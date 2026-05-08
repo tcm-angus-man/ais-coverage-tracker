@@ -12,7 +12,7 @@ function getSheets() {
   const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: email,
-      private_key: privateKey.replace(/\\n/g, "\n"),
+      private_key: privateKey.replace(/\\n/g, "\n").replace(/^"|"$/g, ""),
     },
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
