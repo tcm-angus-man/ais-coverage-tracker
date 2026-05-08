@@ -156,7 +156,7 @@ const DENSITY_OPTIONS: { k: Density; label: string }[] = [
 export default function CoverageGrid({ payload, mode }: { payload: CoveragePayload; mode: ShellMode }) {
   const indexed = useMemo(() => indexPayload(payload), [payload]);
   const { ships, dates, silverDates, silverDateOffset, voyage, silver, silverShipSet, cruiseLineList } = indexed;
-  const { addDraft } = useAssignments();
+  const { addDraft, drafts: assignments } = useAssignments();
   const { data: session } = useSession();
   const isAssigner = session?.user?.role === "assigner";
 
@@ -181,6 +181,19 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const isSilver = mode === "silver";
   const activeDates      = isSilver ? silverDates : dates;
   const activeDateOffset = isSilver ? silverDateOffset : 0;
+
+  // Set of "mmsi|YYYY-MM-DD" for every ship-day covered by an active assignment
+  const assignedCells = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of assignments) {
+      if (!a.ship_mmsi || !a.date_start || !a.date_end) continue;
+      const start = new Date(a.date_start), end = new Date(a.date_end);
+      for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        set.add(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`);
+      }
+    }
+    return set;
+  }, [assignments]);
 
   // Toggle a cruise line in/out of the multi-select set
   const toggleLine = useCallback((cl: string) => {
@@ -358,6 +371,14 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           const cell = silver.cells[shipIdx][di];
           ctx.fillStyle = cell ? (silverCellColor(cell) ?? C_MISSING) : C_MISSING;
           ctx.fillRect(cx, y, cw, ch);
+          // Assignment dot — top-right corner
+          if (assignedCells.has(`${ships[shipIdx].mmsi}|${dates[di]}`)) {
+            const r = Math.max(1.5, Math.min(2.5, CELL_W / 5));
+            ctx.fillStyle = "#e8c170";
+            ctx.beginPath();
+            ctx.arc(cx + cw - r - 1, y + r + 1, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
         } else {
           const vc = voyage.cells[shipIdx][di];
           const sc = silver.cells[shipIdx][di];

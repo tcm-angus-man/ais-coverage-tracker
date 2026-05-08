@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentContext";
 
 type Status = "queued" | "in_progress" | "done" | "blocked";
@@ -16,6 +16,9 @@ const STATUS_LABEL: Record<Status, string> = {
   queued: "Queued", in_progress: "In progress", done: "Done", blocked: "Blocked",
 };
 const ALL_STATUSES: Status[] = ["queued", "in_progress", "done", "blocked"];
+
+// Live-data team slugs — shown first and highlighted in the filter bar
+const LIVE_DATA_SLUGS = ["nick", "ai-ai", "kim"];
 
 const C_BG        = "#0b1014";
 const C_BG2       = "#0f161c";
@@ -51,6 +54,7 @@ export default function QueuePage() {
   const { drafts, loading, reload } = useAssignments();
   const [selected, setSelected] = useState<string | null>(null);
   const [me, setMe] = useState<{ role: Role; slug: string | null; display_name: string | null } | null>(null);
+  const [filterSlug, setFilterSlug] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/me", { credentials: "include" })
@@ -62,9 +66,24 @@ export default function QueuePage() {
   const isAssigner = me?.role === "assigner";
   const mySlug = me?.slug ?? null;
 
-  // Cleaners only see their own assignments
+  // Derive unique assignees from loaded drafts (for filter pills)
+  const assigneeSlugs = useMemo(() => {
+    const seen = new Set<string>();
+    const liveFirst: string[] = [];
+    const rest: string[] = [];
+    for (const d of drafts) {
+      if (d.assignee && !seen.has(d.assignee)) {
+        seen.add(d.assignee);
+        if (LIVE_DATA_SLUGS.includes(d.assignee)) liveFirst.push(d.assignee);
+        else rest.push(d.assignee);
+      }
+    }
+    return [...liveFirst, ...rest];
+  }, [drafts]);
+
+  // Cleaners only see their own; assigners can filter by teammate
   const visibleDrafts = isAssigner
-    ? drafts
+    ? (filterSlug ? drafts.filter(d => d.assignee === filterSlug) : drafts)
     : drafts.filter(d => d.assignee === mySlug);
 
   const active = visibleDrafts.filter(d => toStatus(d.status) !== "done");
@@ -104,6 +123,27 @@ export default function QueuePage() {
             {loading ? "Loading…" : "Refresh"}
           </button>
         </div>
+
+        {/* Assignee filter pills — admin only */}
+        {isAssigner && assigneeSlugs.length > 0 && (
+          <div style={{ padding: "8px 12px", borderBottom: `1px solid ${C_LINE}`, display: "flex", flexWrap: "wrap", gap: 5 }}>
+            <FilterPill
+              label="All"
+              active={filterSlug === null}
+              onClick={() => setFilterSlug(null)}
+            />
+            {assigneeSlugs.map(slug => (
+              <FilterPill
+                key={slug}
+                label={slug.charAt(0).toUpperCase() + slug.slice(1)}
+                active={filterSlug === slug}
+                highlight={LIVE_DATA_SLUGS.includes(slug)}
+                onClick={() => setFilterSlug(prev => prev === slug ? null : slug)}
+                count={drafts.filter(d => d.assignee === slug && toStatus(d.status) !== "done").length}
+              />
+            ))}
+          </div>
+        )}
 
         {loading && drafts.length === 0 ? (
           <div style={{ padding: "10px 16px", fontSize: 11, color: C_INK_FAINT }}>Loading…</div>
@@ -353,6 +393,35 @@ function EmptyState({ isAssigner }: { isAssigner: boolean }) {
           : <>Select an assignment from the list<br />to see details and update its status.</>}
       </div>
     </div>
+  );
+}
+
+function FilterPill({ label, active, highlight, onClick, count }: {
+  label: string;
+  active: boolean;
+  highlight?: boolean;
+  onClick: () => void;
+  count?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        fontSize: 9.5, padding: "3px 8px", borderRadius: 12,
+        border: `1px solid ${active ? C_ACCENT : highlight ? "#e8c17044" : C_LINE}`,
+        background: active ? `${C_ACCENT}22` : "transparent",
+        color: active ? C_ACCENT : highlight ? "#e8c170aa" : C_INK_FAINT,
+        cursor: "pointer", fontFamily: "inherit",
+        display: "flex", alignItems: "center", gap: 4,
+      }}
+    >
+      {label}
+      {count !== undefined && count > 0 && (
+        <span style={{ fontSize: 8.5, background: active ? C_ACCENT : C_LINE, color: active ? "#1a1207" : C_INK_FAINT, borderRadius: 8, padding: "0 4px", lineHeight: "14px" }}>
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 
