@@ -155,7 +155,7 @@ function drawDiagonalCell(ctx: CanvasRenderingContext2D, x: number, y: number, w
 // ---------- types ----------
 type SortKey = "name" | "coverage" | "activity" | "imo" | "cruise_line";
 
-type AssignmentInfo = { assignee: string; status: string; id: string; notes?: string };
+type AssignmentInfo = { assignee: string; status: string; id: string; notes?: string; dateStart: string; dateEnd: string };
 type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: Cell; silver?: Cell; assignment?: AssignmentInfo } | null;
 
 type DragState = { r0: number; c0: number; r1: number; c1: number } | null;
@@ -227,7 +227,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const end   = rawEnd   > windowEnd   ? windowEnd   : rawEnd;
       if (start > end) continue;
       for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
-        map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status, id: a.id, notes: a.notes });
+        map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status, id: a.id, notes: a.notes, dateStart: a.date_start, dateEnd: a.date_end });
       }
     }
     return map;
@@ -570,10 +570,14 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const dateStart = activeDates[c0];
     const dateEnd   = activeDates[c1];
     if (dateStart && dateEnd) {
-      // Single-cell click on an assigned day — open edit modal for anyone, not just assigners
+      // Single-cell click on an assigned day — open edit modal only when the
+      // existing assignment exactly matches this cell's date (i.e. a targeted
+      // assignment). Bulk month-range rows covering this date should not block
+      // creating a new targeted assignment on top.
       const isSingleCell = drag.r0 === drag.r1 && drag.c0 === drag.c1;
       const existing = isSingleCell ? assignedCells.get(`${ship.mmsi}|${dateStart}`) : undefined;
-      if (existing) {
+      const isExactMatch = existing && existing.dateStart === dateStart && existing.dateEnd === dateEnd;
+      if (isExactMatch) {
         setEditModal({ assignment: existing, ship, dateStart, dateEnd });
       } else if (isAssigner) {
         setAssignModal({ ship, dateStart, dateEnd });
