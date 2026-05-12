@@ -147,7 +147,7 @@ function drawDiagonalCell(ctx: CanvasRenderingContext2D, x: number, y: number, w
 // ---------- types ----------
 type SortKey = "name" | "coverage" | "activity" | "imo" | "cruise_line";
 
-type AssignmentInfo = { assignee: string; status: string };
+type AssignmentInfo = { assignee: string; status: string; id: string; notes?: string };
 type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: Cell; silver?: Cell; assignment?: AssignmentInfo } | null;
 
 type DragState = { r0: number; c0: number; r1: number; c1: number } | null;
@@ -170,7 +170,7 @@ const DENSITY_OPTIONS: { k: Density; label: string }[] = [
 export default function CoverageGrid({ payload, mode }: { payload: CoveragePayload; mode: ShellMode }) {
   const indexed = useMemo(() => indexPayload(payload), [payload]);
   const { ships, dates, silverDates, silverDateOffset, voyage, silver, silverShipSet, cruiseLineList } = indexed;
-  const { addDraft, drafts: assignments } = useAssignments();
+  const { addDraft, drafts: assignments, reload: reloadAssignments } = useAssignments();
   const { data: session } = useSession();
   const isAssigner = session?.user?.role === "assigner";
 
@@ -188,6 +188,8 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const [tooltip,     setTooltip]     = useState<TooltipState>(null);
   const [drag,        setDrag]        = useState<DragState>(null);
   const [assignModal, setAssignModal] = useState<{ ship: Ship; dateStart: string; dateEnd: string } | null>(null);
+  const [editModal, setEditModal] = useState<{ assignment: AssignmentInfo; ship: Ship; dateStart: string; dateEnd: string } | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(""); // "" = all
   const [density, setDensity] = useState<Density>("default");
 
   const { w: CELL_W, h: CELL_H } = DENSITY_SIZES[density];
@@ -207,7 +209,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const assignee = a.assignee ?? "";
       const start = new Date(a.date_start), end = new Date(a.date_end);
       for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status });
+        map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status, id: a.id, notes: a.notes });
       }
     }
     return map;
@@ -397,7 +399,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           }
           // Assignment dot — top-right corner, coloured by assignee
           const info = assignedCells.get(`${ships[shipIdx].mmsi}|${dates[di]}`);
-          if (info) {
+          if (info && (!assigneeFilter || info.assignee === assigneeFilter)) {
             const r = Math.max(1.5, Math.min(2.5, CELL_W / 5));
             ctx.fillStyle = ASSIGNEE_COLOR[info.assignee] ?? ASSIGNEE_COLOR_DEFAULT;
             ctx.beginPath();
@@ -498,12 +500,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   }, [colCount, rowCount, baseShipIdx, activeDateOffset, CELL_W, CELL_H]);
 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (mode !== "silver" || !isAssigner) return;
+    if (mode !== "silver") return;
     const hit = hitTest(e);
     if (!hit) return;
+    // All users can click to view/edit assigned cells; drag-to-select is assigner-only
     isDragging.current = true;
     setDrag({ r0: hit.r, c0: hit.c, r1: hit.r, c1: hit.c });
-  }, [mode, hitTest, isAssigner]);
+  }, [mode, hitTest]);
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const hit = hitTest(e);
@@ -521,22 +524,27 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   }, [hitTest, ships, dates, payload, mode, assignedCells]);
 
   const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging.current || !drag || mode !== "silver" || !isAssigner) { isDragging.current = false; return; }
+    if (!isDragging.current || !drag || mode !== "silver") { isDragging.current = false; return; }
     isDragging.current = false;
     const r0 = Math.min(drag.r0, drag.r1), r1 = Math.max(drag.r0, drag.r1);
     const c0 = Math.min(drag.c0, drag.c1), c1 = Math.max(drag.c0, drag.c1);
-    // Only open modal if more than a single accidental click (allow single-cell)
     const shipIdx = baseShipIdx[r0];
     const ship = ships[shipIdx];
-    // For multi-ship drags, just use first ship (row-based assignment)
     const dateStart = activeDates[c0];
     const dateEnd   = activeDates[c1];
     if (dateStart && dateEnd) {
-      setAssignModal({ ship, dateStart, dateEnd });
+      // Single-cell click on an assigned day — open edit modal for anyone, not just assigners
+      const isSingleCell = r0 === drag.r1 && c0 === drag.c1;
+      const existing = isSingleCell ? assignedCells.get(`${ship.mmsi}|${dateStart}`) : undefined;
+      if (existing) {
+        setEditModal({ assignment: existing, ship, dateStart, dateEnd });
+      } else if (isAssigner) {
+        setAssignModal({ ship, dateStart, dateEnd });
+      }
     }
     setDrag(null);
     void e;
-  }, [drag, mode, isAssigner, baseShipIdx, ships, activeDates]);
+  }, [drag, mode, isAssigner, baseShipIdx, ships, activeDates, assignedCells]);
 
   const onMouseLeave = useCallback(() => {
     setTooltip(null);
@@ -618,6 +626,18 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         </div>
 
         {mode === "silver" && (
+          <>
+            <Divider />
+            <CtrlLabel>Assignee</CtrlLabel>
+            <AssigneeFilterPills
+              assigneeFilter={assigneeFilter}
+              setAssigneeFilter={setAssigneeFilter}
+              session={session}
+            />
+          </>
+        )}
+
+        {mode === "silver" && isAssigner && (
           <span style={{ fontSize: 9.5, color: C_VISIBLE, letterSpacing: "0.04em" }}>
             ↖ drag to select cells for assignment
           </span>
@@ -678,6 +698,31 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
             }).catch(e => console.error("[assign] fetch error:", e));
           }}
           onClose={() => setAssignModal(null)}
+        />
+      )}
+
+      {editModal && (
+        <EditAssignmentModal
+          assignment={editModal.assignment}
+          ship={editModal.ship}
+          dateStart={editModal.dateStart}
+          dateEnd={editModal.dateEnd}
+          isAssigner={isAssigner}
+          currentSlug={session?.user?.slug ?? ""}
+          onSave={async (status, notes) => {
+            const id = editModal.assignment.id;
+            setEditModal(null);
+            fetch(`/api/sheets/assignments/${id}`, {
+              method: "PATCH",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status, notes }),
+            }).then(r => r.json()).then(r => {
+              if (!r.ok) console.error("[edit-assign] PATCH failed:", r.error);
+              else reloadAssignments();
+            }).catch(e => console.error("[edit-assign] fetch error:", e));
+          }}
+          onClose={() => setEditModal(null)}
         />
       )}
     </div>
@@ -890,6 +935,12 @@ function SilverTooltip({ cell }: { cell: Cell }) {
         </div>
       ))}
       <div style={{ marginTop: 4, fontSize: 10, color: clean ? C_SILVER_OK : C_SILVER_NR, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>{clean ? "Clean" : "Needs review"}</div>
+      {cell.u === 1 && (
+        <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 6, height: 6, borderRadius: 1, background: C_UPDATED, display: "inline-block", flexShrink: 0 }} />
+          <span style={{ fontSize: 9.5, color: C_UPDATED, letterSpacing: "0.06em" }}>Human updated</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -925,7 +976,7 @@ function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
         <div>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 8 }}>New Assignment</div>
           <div style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 20, color: C_INK }}>{ship.display_name}</div>
-          <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{dateStart} → {dateEnd}</div>
+          <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>MMSI {ship.mmsi} · {dateStart} → {dateEnd}</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.12em", color: C_INK_FAINT }}>Assignee</label>
@@ -1001,3 +1052,133 @@ function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
 
 const inputStyle: React.CSSProperties = { padding: "7px 10px", background: C_BG, border: `1px solid ${C_LINE}`, borderRadius: 3, fontSize: 12, color: C_INK, fontFamily: "inherit", outline: "none", width: "100%" };
 const btnStyle: React.CSSProperties = { padding: "7px 18px", borderRadius: 3, fontSize: 11, fontFamily: "inherit", cursor: "pointer" };
+
+const STATUS_OPTIONS = ["queued", "in_progress", "blocked", "done"] as const;
+type StatusOption = (typeof STATUS_OPTIONS)[number];
+
+function EditAssignmentModal({ assignment, ship, dateStart, dateEnd, isAssigner, currentSlug, onSave, onClose }: {
+  assignment: AssignmentInfo;
+  ship: Ship;
+  dateStart: string;
+  dateEnd: string;
+  isAssigner: boolean;
+  currentSlug: string;
+  onSave: (status: string, notes: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [status, setStatus] = useState<StatusOption>(assignment.status as StatusOption ?? "queued");
+  const [notes, setNotes]   = useState(assignment.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const assigneeColor = ASSIGNEE_COLOR[assignment.assignee] ?? ASSIGNEE_COLOR_DEFAULT;
+  const canEdit = isAssigner || assignment.assignee === currentSlug;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: C_PANEL, border: `1px solid ${C_LINE}`, borderRadius: 6, padding: "28px 32px", width: 420, display: "flex", flexDirection: "column", gap: 18 }}>
+        <div>
+          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.18em", color: C_INK_FAINT, marginBottom: 8 }}>Assignment</div>
+          <div style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 20, color: C_INK }}>{ship.display_name}</div>
+          <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>MMSI {ship.mmsi} · {dateStart} → {dateEnd}</div>
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: assigneeColor, display: "inline-block" }} />
+            <span style={{ fontSize: 11, color: assigneeColor, fontWeight: 600 }}>{assignment.assignee || "—"}</span>
+          </div>
+        </div>
+
+        {canEdit ? (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.12em", color: C_INK_FAINT }}>Status</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {STATUS_OPTIONS.map(s => {
+                  const active = status === s;
+                  return (
+                    <button key={s} onClick={() => setStatus(s)} style={{
+                      padding: "5px 12px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+                      fontSize: 10.5, border: `1px solid ${active ? C_VISIBLE : C_LINE}`,
+                      background: active ? `${C_VISIBLE}22` : "transparent",
+                      color: active ? C_VISIBLE : C_INK_FAINT, fontWeight: active ? 600 : 400,
+                    }}>
+                      {s.replace("_", " ")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.12em", color: C_INK_FAINT }}>Notes</label>
+              <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="optional" style={{ ...inputStyle }} />
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={onClose} style={{ ...btnStyle, background: "transparent", color: C_INK_FAINT, border: `1px solid ${C_LINE}` }}>Cancel</button>
+              <button
+                onClick={async () => { setSaving(true); await onSave(status, notes); setSaving(false); }}
+                disabled={saving}
+                style={{ ...btnStyle, background: saving ? C_LINE : "var(--accent)", color: saving ? C_INK_FAINT : "#1a1207", border: "none", fontWeight: 600 }}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, color: C_INK_DIM }}>
+              Status: <span style={{ color: C_INK, fontWeight: 600 }}>{assignment.status}</span>
+            </div>
+            {assignment.notes && <div style={{ fontSize: 11, color: C_INK_DIM }}>Notes: {assignment.notes}</div>}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={onClose} style={{ ...btnStyle, background: "transparent", color: C_INK_FAINT, border: `1px solid ${C_LINE}` }}>Close</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Assignee filter pills for the cleanliness tab controls bar.
+// Cleaners see "All" + "Assigned to me" only.
+// Assigners see "All" + one pill per live-data team member.
+function AssigneeFilterPills({ assigneeFilter, setAssigneeFilter, session }: {
+  assigneeFilter: string;
+  setAssigneeFilter: (v: string) => void;
+  session: ReturnType<typeof useSession>["data"];
+}) {
+  const isAssigner = session?.user?.role === "assigner";
+  const mySlug = session?.user?.slug ?? "";
+
+  const pills: { label: string; value: string; color?: string }[] = [
+    { label: "All", value: "" },
+  ];
+
+  if (isAssigner) {
+    for (const m of ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug))) {
+      pills.push({ label: m.display_name, value: m.slug, color: ASSIGNEE_COLOR[m.slug] });
+    }
+  } else if (mySlug) {
+    pills.push({ label: "Assigned to me", value: mySlug, color: ASSIGNEE_COLOR[mySlug] ?? ASSIGNEE_COLOR_DEFAULT });
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      {pills.map(p => {
+        const active = assigneeFilter === p.value;
+        const col = p.color ?? C_INK_DIM;
+        return (
+          <button
+            key={p.value}
+            onClick={() => setAssigneeFilter(p.value)}
+            style={{
+              padding: "3px 9px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+              fontSize: 10, border: `1px solid ${active ? col : C_LINE}`,
+              background: active ? `${col}22` : "transparent",
+              color: active ? col : C_INK_FAINT, fontWeight: active ? 600 : 400,
+            }}
+          >
+            {p.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

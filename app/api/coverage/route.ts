@@ -19,7 +19,7 @@ export async function GET() {
     const payload = await decompressJson<CoveragePayload>(buf);
     return NextResponse.json(payload, {
       headers: {
-        "Cache-Control": "max-age=3600",
+        "Cache-Control": "no-store",
         ETag: `"${payload.generated_at}"`,
       },
     });
