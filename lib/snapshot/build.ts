@@ -59,6 +59,7 @@ export async function buildSnapshot(): Promise<BuildResult> {
       sp: r.sp,
       ol: r.ol,
       u: r.u,
+      ...(r.updated_by != null ? { updated_by: r.updated_by } : {}),
     };
   }
 

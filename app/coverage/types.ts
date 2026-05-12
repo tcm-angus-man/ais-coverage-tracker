@@ -20,6 +20,8 @@ export type Cell = {
   ol: number;
   /** Silver only: 1 if the underlying silver_state row was last updated by a human (not data-platform), else 0. */
   u?: number;
+  /** Silver only: the db updated_by value (numeric string) when u=1, undefined otherwise. */
+  updated_by?: string;
 };
 
 export type CoveragePayload = {

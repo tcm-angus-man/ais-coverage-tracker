@@ -156,8 +156,7 @@ function ActivityBarChart({ data, reviewers, maxBars }: { data: BarDatum[]; revi
   );
 }
 
-// 24-hour stacked bar chart. X-axis = hour of day (00–23, server time),
-// Y-axis = ship-day updates, stacks coloured by teammate.
+// 24-hour SVG line chart. One line per teammate, X = hour, Y = updates that hour.
 function TodayHourlyChart({ hourly, reviewers, total }: { hourly: TodayHourly[]; reviewers: Reviewer[]; total: number }) {
   const [hovered, setHovered] = useState<{ hour: number; x: number; y: number } | null>(null);
 
@@ -172,59 +171,92 @@ function TodayHourlyChart({ hourly, reviewers, total }: { hourly: TodayHourly[];
   const colorByUserId = new Map(reviewers.map(r => [r.user_id, r.color] as const));
   const fallback = C_ACCENT;
 
-  // Sum per hour (across teammates) to find Y-axis max
+  const W = 800, H = 140, PAD_L = 28, PAD_B = 20, PAD_T = 8, PAD_R = 8;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+
   const hourTotals = new Array(24).fill(0);
-  for (const h of hourly) {
-    for (let i = 0; i < 24; i++) hourTotals[i] += h.hours[i];
-  }
-  const maxHour = Math.max(...hourTotals, 1);
-  const CHART_H = 140;
+  for (const r of hourly) for (let i = 0; i < 24; i++) hourTotals[i] += r.hours[i];
+  const maxVal = Math.max(...hourly.flatMap(r => r.hours), 1);
+
+  const xOf = (h: number) => PAD_L + (h / 23) * chartW;
+  const yOf = (v: number) => PAD_T + chartH - (v / maxVal) * chartH;
+
+  const toPath = (hours: number[]) =>
+    hours.map((v, h) => `${h === 0 ? "M" : "L"}${xOf(h).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
 
   return (
     <div style={{ position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", height: CHART_H, gap: 2 }}>
-        {Array.from({ length: 24 }, (_, h) => {
-          const slices = hourly
-            .map(r => ({ user_id: r.user_id, display_name: r.display_name, count: r.hours[h] }))
-            .filter(s => s.count > 0)
-            .sort((a, b) => b.count - a.count); // largest on bottom of stack
-          const totalForHour = hourTotals[h];
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: "100%", height: H, display: "block", overflow: "visible" }}
+        onMouseMove={e => {
+          const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
+          const relX = (e.clientX - rect.left) / rect.width * W;
+          const h = Math.round(((relX - PAD_L) / chartW) * 23);
+          if (h >= 0 && h <= 23) setHovered({ hour: h, x: e.clientX, y: rect.top + PAD_T });
+          else setHovered(null);
+        }}
+        onMouseLeave={() => setHovered(null)}
+      >
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map(f => {
+          const y = PAD_T + chartH * (1 - f);
           return (
-            <div
-              key={h}
-              style={{ display: "flex", flexDirection: "column-reverse", flex: 1, cursor: "pointer", position: "relative", height: CHART_H, justifyContent: "flex-start" }}
-              onMouseEnter={e => {
-                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setHovered({ hour: h, x: rect.left + rect.width / 2, y: rect.top });
-              }}
-              onMouseLeave={() => setHovered(null)}
-            >
-              {totalForHour === 0 ? (
-                <div style={{ background: C_LINE, height: 2, borderRadius: "1px 1px 0 0" }} />
-              ) : (
-                slices.map(s => {
-                  const segH = Math.max(1, Math.round((s.count / maxHour) * CHART_H));
-                  return (
-                    <div
-                      key={s.user_id}
-                      style={{ background: colorByUserId.get(s.user_id) ?? fallback, height: segH }}
-                    />
-                  );
-                })
-              )}
-            </div>
+            <g key={f}>
+              <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke={C_LINE} strokeWidth={1} />
+              {f > 0 && <text x={PAD_L - 4} y={y + 3.5} fontSize={7} fill={C_INK_FAINT} textAnchor="end">{Math.round(maxVal * f)}</text>}
+            </g>
           );
         })}
-      </div>
 
-      {/* X-axis labels — every 3 hours */}
-      <div style={{ display: "flex", gap: 2, marginTop: 4 }}>
-        {Array.from({ length: 24 }, (_, h) => (
-          <div key={h} style={{ flex: 1, fontSize: 8.5, color: C_INK_FAINT, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
-            {h % 3 === 0 ? String(h).padStart(2, "0") : ""}
-          </div>
+        {/* Lines per reviewer */}
+        {hourly.map(r => {
+          const color = colorByUserId.get(r.user_id) ?? fallback;
+          const active = hovered && r.hours[hovered.hour] > 0;
+          return (
+            <path
+              key={r.user_id}
+              d={toPath(r.hours)}
+              fill="none"
+              stroke={color}
+              strokeWidth={active ? 2.5 : 1.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              opacity={hovered ? (active ? 1 : 0.25) : 0.85}
+              style={{ transition: "opacity 0.1s, stroke-width 0.1s" }}
+            />
+          );
+        })}
+
+        {/* Hover vertical line */}
+        {hovered && (
+          <line
+            x1={xOf(hovered.hour)} y1={PAD_T}
+            x2={xOf(hovered.hour)} y2={PAD_T + chartH}
+            stroke={C_INK_FAINT} strokeWidth={1} strokeDasharray="3 3"
+          />
+        )}
+
+        {/* Dots at hovered hour */}
+        {hovered && hourly.filter(r => r.hours[hovered.hour] > 0).map(r => {
+          const color = colorByUserId.get(r.user_id) ?? fallback;
+          return (
+            <circle
+              key={r.user_id}
+              cx={xOf(hovered.hour)} cy={yOf(r.hours[hovered.hour])}
+              r={3} fill={color} stroke={C_BG} strokeWidth={1.5}
+            />
+          );
+        })}
+
+        {/* X-axis labels every 3h */}
+        {Array.from({ length: 24 }, (_, h) => h % 3 === 0 && (
+          <text key={h} x={xOf(h)} y={H - 4} fontSize={8} fill={C_INK_FAINT} textAnchor="middle">
+            {String(h).padStart(2, "0")}
+          </text>
         ))}
-      </div>
+      </svg>
 
       {/* Hover tooltip */}
       {hovered && (
@@ -269,7 +301,7 @@ function TodayHourlyChart({ hourly, reviewers, total }: { hourly: TodayHourly[];
             const color = colorByUserId.get(r.user_id) ?? fallback;
             return (
               <div key={r.user_id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                <div style={{ width: 20, height: 2, borderRadius: 1, background: color }} />
                 <span style={{ fontSize: 10, color: C_INK_DIM }}>{r.display_name}</span>
               </div>
             );

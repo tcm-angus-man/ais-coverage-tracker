@@ -206,7 +206,12 @@ export async function fetchSilverCells(pool: Pool): Promise<SilverCellRow[]> {
         WHEN ass.updated_by IS NOT NULL
          AND ass.updated_by NOT IN ('data-platform')
         THEN 1 ELSE 0
-      END)::int AS u
+      END)::int AS u,
+      (CASE
+        WHEN ass.updated_by IS NOT NULL
+         AND ass.updated_by NOT IN ('data-platform')
+        THEN ass.updated_by ELSE NULL
+      END) AS updated_by
     FROM ais_silver_summary ass
     WHERE ass.date >= $1::date
       AND ass.date <= CURRENT_DATE

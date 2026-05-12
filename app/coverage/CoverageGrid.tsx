@@ -16,6 +16,14 @@ import { useAssignments } from "./AssignmentContext";
 // Cleaners who work live-data — highlighted in the assignee picker
 const LIVE_DATA_TEAM = new Set(["nick", "ai-ai", "kim"]);
 
+// Client-safe db_user_id → display_name lookup (mirrors lib/sheets/team-config.ts,
+// can't import that here because it has "server-only").
+const USER_ID_TO_NAME: Record<string, string> = {
+  "8": "Angus", "10": "Mon", "11": "Bea", "12": "Ronnel", "13": "Kaye",
+  "16": "Coleen", "17": "Kim", "19": "Nick", "21": "Nicole", "22": "Jayziel",
+  "23": "Ai-ai", "26": "Rome", "28": "Rich", "29": "Dave", "31": "Jen", "37": "Jovi",
+};
+
 // Distinct colour per live-data cleaner so the dot signals who owns it at a glance.
 // Other cleaners share a neutral amber dot.
 const ASSIGNEE_COLOR: Record<string, string> = {
@@ -224,6 +232,18 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     });
   }, []);
 
+  // Set of mmsis that have at least one assigned day for the active assignee filter
+  const filteredAssigneeMmsis = useMemo(() => {
+    if (!assigneeFilter) return null;
+    const mmsis = new Set<number>();
+    for (const a of assignments) {
+      if ((a.assignee ?? "") === assigneeFilter && a.status !== "done" && a.ship_mmsi) {
+        mmsis.add(a.ship_mmsi);
+      }
+    }
+    return mmsis;
+  }, [assigneeFilter, assignments]);
+
   // Filtered + sorted ship index list
   const baseShipIdx = useMemo(() => {
     let idxs = ships.map((_, i) => i).filter(i => {
@@ -231,6 +251,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       if (isSilver && !silverShipSet.has(s.mmsi)) return false;
       if (inServiceOnly && !s.in_service) return false;
       if (selectedLines.size > 0 && !selectedLines.has(s.cruise_line)) return false;
+      if (filteredAssigneeMmsis && !filteredAssigneeMmsis.has(s.mmsi)) return false;
       if (filter.trim()) {
         const q = filter.toLowerCase();
         return s.display_name.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.cruise_line.toLowerCase().includes(q) || String(s.mmsi).includes(q);
@@ -266,7 +287,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       idxs.sort((a, b) => ships[a].display_name.localeCompare(ships[b].display_name));
     }
     return idxs;
-  }, [ships, filter, inServiceOnly, selectedLines, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver]);
+  }, [ships, filter, inServiceOnly, selectedLines, filteredAssigneeMmsis, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver]);
 
   // KPIs — filter-aware
   const kpis = useMemo(() => {
@@ -399,12 +420,18 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           }
           // Assignment dot — top-right corner, coloured by assignee
           const info = assignedCells.get(`${ships[shipIdx].mmsi}|${dates[di]}`);
-          if (info && (!assigneeFilter || info.assignee === assigneeFilter)) {
+          const dotVisible = info && (!assigneeFilter || info.assignee === assigneeFilter);
+          if (dotVisible) {
             const r = Math.max(1.5, Math.min(2.5, CELL_W / 5));
             ctx.fillStyle = ASSIGNEE_COLOR[info.assignee] ?? ASSIGNEE_COLOR_DEFAULT;
             ctx.beginPath();
             ctx.arc(cx + cw - r - 1, y + r + 1, r, 0, Math.PI * 2);
             ctx.fill();
+          }
+          // Dim cells that don't match the active assignee filter
+          if (assigneeFilter && !dotVisible) {
+            ctx.fillStyle = "rgba(11,16,20,0.55)";
+            ctx.fillRect(cx, y, cw, ch);
           }
         } else {
           const vc = voyage.cells[shipIdx][di];
@@ -938,7 +965,9 @@ function SilverTooltip({ cell }: { cell: Cell }) {
       {cell.u === 1 && (
         <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 6, height: 6, borderRadius: 1, background: C_UPDATED, display: "inline-block", flexShrink: 0 }} />
-          <span style={{ fontSize: 9.5, color: C_UPDATED, letterSpacing: "0.06em" }}>Human updated</span>
+          <span style={{ fontSize: 9.5, color: C_UPDATED, letterSpacing: "0.06em" }}>
+            Updated by {cell.updated_by ? (USER_ID_TO_NAME[cell.updated_by] ?? cell.updated_by) : "human"}
+          </span>
         </div>
       )}
     </div>

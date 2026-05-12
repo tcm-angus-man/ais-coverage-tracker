@@ -35,6 +35,7 @@ export type SilverCellRow = {
   sp: number;
   ol: number;
   u: number; // 1 if last touched by a human (not data-platform), else 0
+  updated_by: string | null; // raw db updated_by value when u=1, null otherwise
 };
 
 // Two anchored windows — see .claude/rules/snapshot-conventions.md
