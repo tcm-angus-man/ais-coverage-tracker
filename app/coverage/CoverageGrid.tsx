@@ -576,9 +576,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       // creating a new targeted assignment on top.
       const isSingleCell = drag.r0 === drag.r1 && drag.c0 === drag.c1;
       const existing = isSingleCell ? assignedCells.get(`${ship.mmsi}|${dateStart}`) : undefined;
-      const isExactMatch = existing && existing.dateStart === dateStart && existing.dateEnd === dateEnd;
-      if (isExactMatch) {
-        setEditModal({ assignment: existing, ship, dateStart, dateEnd });
+      if (existing) {
+        // Open edit modal using the assignment's own date range (may be a month-range bulk row)
+        setEditModal({ assignment: existing, ship, dateStart: existing.dateStart, dateEnd: existing.dateEnd });
       } else if (isAssigner) {
         setAssignModal({ ship, dateStart, dateEnd });
       }
