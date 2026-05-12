@@ -208,22 +208,30 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
 
   // Map "mmsi|YYYY-MM-DD" → { assignee, status } for every ship-day covered
   // by an active (non-done) assignment. Used for dot rendering and tooltips.
+  // Clamp iteration to the silver date window to avoid expanding bulk
+  // month-range assignments into hundreds of thousands of map entries.
   const assignedCells = useMemo(() => {
     const map = new Map<string, AssignmentInfo>();
+    const windowStart = new Date(silverDates[0] + "T00:00:00Z");
+    const windowEnd   = new Date(silverDates[silverDates.length - 1] + "T00:00:00Z");
     for (const a of assignments) {
       if (!a.ship_mmsi || !a.date_start || !a.date_end) continue;
       const status = a.status ?? "queued";
-      if (status === "done") continue; // hide dots once cleaning is finished
+      if (status === "done") continue;
       const assignee = a.assignee ?? "";
-      // Parse as UTC midnight to avoid DST shifts (e.g. Oct 31 / Mar 31 in GMT+1
-      // would otherwise resolve to the previous day via toISOString()).
-      const start = new Date(a.date_start + "T00:00:00Z"), end = new Date(a.date_end + "T00:00:00Z");
+      // Parse as UTC midnight to avoid DST shifts (e.g. Oct 31 / Mar 31 in GMT+1)
+      const rawStart = new Date(a.date_start + "T00:00:00Z");
+      const rawEnd   = new Date(a.date_end   + "T00:00:00Z");
+      // Clamp to the visible silver window
+      const start = rawStart < windowStart ? windowStart : rawStart;
+      const end   = rawEnd   > windowEnd   ? windowEnd   : rawEnd;
+      if (start > end) continue;
       for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
         map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status, id: a.id, notes: a.notes });
       }
     }
     return map;
-  }, [assignments]);
+  }, [assignments, silverDates]);
 
   // Toggle a cruise line in/out of the multi-select set
   const toggleLine = useCallback((cl: string) => {
@@ -713,6 +721,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
               date_start: assignModal.dateStart,
               date_end: assignModal.dateEnd,
               created_at: new Date().toISOString(),
+              assignee,
+              status: "queued" as const,
+              notes,
             };
             addDraft(draft);
             setAssignModal(null);
