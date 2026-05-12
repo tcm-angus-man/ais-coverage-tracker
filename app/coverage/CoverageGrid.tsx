@@ -16,6 +16,19 @@ import { useAssignments } from "./AssignmentContext";
 // Cleaners who work live-data — highlighted in the assignee picker
 const LIVE_DATA_TEAM = new Set(["nick", "ai-ai", "kim"]);
 
+// Distinct colour per live-data cleaner so the dot signals who owns it at a glance.
+// Other cleaners share a neutral amber dot.
+const ASSIGNEE_COLOR: Record<string, string> = {
+  "nick":  "#5fa8f7", // blue
+  "kim":   "#d97bd9", // magenta
+  "ai-ai": "#7ad6a8", // green
+};
+const ASSIGNEE_COLOR_DEFAULT = "#e8c170"; // amber
+
+// Border colour for silver cells where the underlying silver row was last
+// touched by a human (not data-platform).
+const C_UPDATED = "#5fa8f7";
+
 const HEADER_H = 36;
 const HEADER_W = 200;
 
@@ -134,7 +147,8 @@ function drawDiagonalCell(ctx: CanvasRenderingContext2D, x: number, y: number, w
 // ---------- types ----------
 type SortKey = "name" | "coverage" | "activity" | "imo" | "cruise_line";
 
-type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: Cell; silver?: Cell } | null;
+type AssignmentInfo = { assignee: string; status: string };
+type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: Cell; silver?: Cell; assignment?: AssignmentInfo } | null;
 
 type DragState = { r0: number; c0: number; r1: number; c1: number } | null;
 
@@ -182,17 +196,21 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const activeDates      = isSilver ? silverDates : dates;
   const activeDateOffset = isSilver ? silverDateOffset : 0;
 
-  // Set of "mmsi|YYYY-MM-DD" for every ship-day covered by an active assignment
+  // Map "mmsi|YYYY-MM-DD" → { assignee, status } for every ship-day covered
+  // by an active (non-done) assignment. Used for dot rendering and tooltips.
   const assignedCells = useMemo(() => {
-    const set = new Set<string>();
+    const map = new Map<string, AssignmentInfo>();
     for (const a of assignments) {
       if (!a.ship_mmsi || !a.date_start || !a.date_end) continue;
+      const status = a.status ?? "queued";
+      if (status === "done") continue; // hide dots once cleaning is finished
+      const assignee = a.assignee ?? "";
       const start = new Date(a.date_start), end = new Date(a.date_end);
       for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        set.add(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`);
+        map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status });
       }
     }
-    return set;
+    return map;
   }, [assignments]);
 
   // Toggle a cruise line in/out of the multi-select set
@@ -371,10 +389,17 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           const cell = silver.cells[shipIdx][di];
           ctx.fillStyle = cell ? (silverCellColor(cell) ?? C_MISSING) : C_MISSING;
           ctx.fillRect(cx, y, cw, ch);
-          // Assignment dot — top-right corner
-          if (assignedCells.has(`${ships[shipIdx].mmsi}|${dates[di]}`)) {
+          // Human-touched silver row — blue 1px outline
+          if (cell && cell.u === 1) {
+            ctx.strokeStyle = C_UPDATED;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cx + 0.5, y + 0.5, cw - 1, ch - 1);
+          }
+          // Assignment dot — top-right corner, coloured by assignee
+          const info = assignedCells.get(`${ships[shipIdx].mmsi}|${dates[di]}`);
+          if (info) {
             const r = Math.max(1.5, Math.min(2.5, CELL_W / 5));
-            ctx.fillStyle = "#e8c170";
+            ctx.fillStyle = ASSIGNEE_COLOR[info.assignee] ?? ASSIGNEE_COLOR_DEFAULT;
             ctx.beginPath();
             ctx.arc(cx + cw - r - 1, y + r + 1, r, 0, Math.PI * 2);
             ctx.fill();
@@ -487,12 +512,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const date = dates[hit.dateIdx];
     const v = payload.voyage_cells[String(ship.mmsi)]?.[date];
     const s = payload.silver_cells[String(ship.mmsi)]?.[date];
-    setTooltip({ x: e.clientX, y: e.clientY, ship, date, voyage: v, silver: s });
+    const assignment = assignedCells.get(`${ship.mmsi}|${date}`);
+    setTooltip({ x: e.clientX, y: e.clientY, ship, date, voyage: v, silver: s, assignment });
     if (isDragging.current && mode === "silver") {
       setDrag(prev => prev ? { ...prev, r1: hit.r, c1: hit.c } : prev);
       setRenderTick(n => (n + 1) | 0);
     }
-  }, [hitTest, ships, dates, payload, mode]);
+  }, [hitTest, ships, dates, payload, mode, assignedCells]);
 
   const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDragging.current || !drag || mode !== "silver" || !isAssigner) { isDragging.current = false; return; }
@@ -800,7 +826,10 @@ function Legend({ mode }: { mode: ShellMode }) {
 }
 
 function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; mode: ShellMode }) {
-  const { x, y, ship, date, voyage, silver } = tooltip;
+  const { x, y, ship, date, voyage, silver, assignment } = tooltip;
+  const assigneeColor = assignment
+    ? (ASSIGNEE_COLOR[assignment.assignee] ?? ASSIGNEE_COLOR_DEFAULT)
+    : null;
   return (
     <div style={{
       position: "fixed", zIndex: 50, pointerEvents: "none",
@@ -820,6 +849,15 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
       {(mode === "voyage" || mode === "combined") && voyage && <VoyageTooltip cell={voyage} />}
       {(mode === "silver" || mode === "combined") && silver && <SilverTooltip cell={silver} />}
       {!voyage && !silver && <div style={{ color: C_INK_FAINT }}>no data</div>}
+      {/* Assignment footer — silver/cleanliness page only */}
+      {(mode === "silver" || mode === "combined") && assignment && assigneeColor && (
+        <div style={{ borderTop: `1px solid ${C_LINE}`, marginTop: 6, paddingTop: 5, display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: assigneeColor, display: "inline-block" }} />
+          <span style={{ fontSize: 9.5, color: C_INK_FAINT, textTransform: "uppercase", letterSpacing: "0.1em" }}>Assigned to</span>
+          <span style={{ fontSize: 10.5, color: assigneeColor, fontWeight: 600 }}>{assignment.assignee || "—"}</span>
+          <span style={{ fontSize: 9, color: C_INK_FAINT, marginLeft: "auto" }}>{assignment.status}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -889,25 +927,53 @@ function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
           <div style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 20, color: C_INK }}>{ship.display_name}</div>
           <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{dateStart} → {dateEnd}</div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.12em", color: C_INK_FAINT }}>Assignee</label>
-          <select
-            value={assignee}
-            onChange={e => setAssignee(e.target.value)}
-            style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}
-          >
-            <option value="" disabled>Select team member…</option>
-            <optgroup label="Live-data team">
-              {ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug)).map(m => (
-                <option key={m.slug} value={m.slug}>{m.display_name} ★</option>
-              ))}
-            </optgroup>
-            <optgroup label="Other cleaners">
-              {ASSIGNABLE_MEMBERS.filter(m => !LIVE_DATA_TEAM.has(m.slug)).map(m => (
-                <option key={m.slug} value={m.slug}>{m.display_name}</option>
-              ))}
-            </optgroup>
-          </select>
+          <div style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginTop: 2 }}>Live-data team</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug)).map(m => {
+              const col = ASSIGNEE_COLOR[m.slug] ?? ASSIGNEE_COLOR_DEFAULT;
+              const selected = assignee === m.slug;
+              return (
+                <button
+                  key={m.slug}
+                  onClick={() => setAssignee(m.slug)}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "5px 10px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${selected ? col : `${col}55`}`,
+                    background: selected ? `${col}22` : "transparent",
+                    color: col,
+                  }}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: col, display: "inline-block" }} />
+                  {m.display_name}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginTop: 6 }}>Other cleaners</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {ASSIGNABLE_MEMBERS.filter(m => !LIVE_DATA_TEAM.has(m.slug)).map(m => {
+              const selected = assignee === m.slug;
+              return (
+                <button
+                  key={m.slug}
+                  onClick={() => setAssignee(m.slug)}
+                  style={{
+                    padding: "4px 9px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 10.5,
+                    border: `1px solid ${selected ? C_INK_DIM : C_LINE}`,
+                    background: selected ? C_PANEL : "transparent",
+                    color: selected ? C_INK : C_INK_FAINT,
+                  }}
+                >
+                  {m.display_name}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <label style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.12em", color: C_INK_FAINT }}>Notes</label>

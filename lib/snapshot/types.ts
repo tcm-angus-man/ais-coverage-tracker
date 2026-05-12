@@ -34,6 +34,7 @@ export type SilverCellRow = {
   dd: number;
   sp: number;
   ol: number;
+  u: number; // 1 if last touched by a human (not data-platform), else 0
 };
 
 // Two anchored windows — see .claude/rules/snapshot-conventions.md

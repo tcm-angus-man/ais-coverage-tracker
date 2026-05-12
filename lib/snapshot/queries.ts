@@ -197,7 +197,12 @@ export async function fetchSilverCells(pool: Pool): Promise<SilverCellRow[]> {
       COALESCE(ass.delta_time_count, 0)::int     AS dt,
       COALESCE(ass.delta_distance_count, 0)::int AS dd,
       COALESCE(ass.spike_count, 0)::int          AS sp,
-      COALESCE(ass.overland_count, 0)::int       AS ol
+      COALESCE(ass.overland_count, 0)::int       AS ol,
+      (CASE
+        WHEN ass.updated_by IS NOT NULL
+         AND ass.updated_by NOT IN ('data-platform')
+        THEN 1 ELSE 0
+      END)::int AS u
     FROM ais_silver_summary ass
     WHERE ass.date >= $1::date
       AND ass.date <= CURRENT_DATE

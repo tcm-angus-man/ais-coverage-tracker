@@ -58,6 +58,7 @@ export async function buildSnapshot(): Promise<BuildResult> {
       dd: r.dd,
       sp: r.sp,
       ol: r.ol,
+      u: r.u,
     };
   }
 

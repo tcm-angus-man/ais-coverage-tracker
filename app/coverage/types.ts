@@ -18,6 +18,8 @@ export type Cell = {
   dd: number;
   sp: number;
   ol: number;
+  /** Silver only: 1 if the underlying silver_state row was last updated by a human (not data-platform), else 0. */
+  u?: number;
 };
 
 export type CoveragePayload = {
