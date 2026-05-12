@@ -17,7 +17,7 @@ export async function GET() {
 
     const pool = getPool();
 
-    const [reviewersRes, totalRes, recentRes, dailyRes, daily30Res, todayRes] = await Promise.all([
+    const [reviewersRes, totalRes, recentRes, dailyRes, daily30Res, todayRes, todayHourlyRes] = await Promise.all([
       pool.query<{ updated_by: string; days_cleaned: string; last_active: string }>(`
         SELECT
           updated_by,
@@ -115,6 +115,25 @@ export async function GET() {
         GROUP BY updated_by
         ORDER BY count DESC
       `),
+
+      // Today's activity bucketed by hour (00–23) per reviewer. Used by the
+      // hourly time-series chart on the progress page.
+      pool.query<{ updated_by: string; hour: number; count: string }>(`
+        SELECT
+          updated_by,
+          EXTRACT(HOUR FROM updated_at)::int AS hour,
+          COUNT(*) AS count
+        FROM ais_silver_summary
+        WHERE updated_by IS NOT NULL
+          AND updated_by NOT IN ('data-platform')
+          AND updated_at::date = CURRENT_DATE
+          AND delta_time_count      = 0
+          AND delta_distance_count  = 0
+          AND spike_count           = 0
+          AND overland_count        = 0
+        GROUP BY updated_by, EXTRACT(HOUR FROM updated_at)
+        ORDER BY hour ASC
+      `),
     ]);
 
     const dailyByReviewer = new Map<string, { date: string; count: number }[]>();
@@ -171,7 +190,26 @@ export async function GET() {
         };
       });
 
-    return NextResponse.json({ ok: true, reviewers, totals, recent, today });
+    // Group hourly buckets by reviewer → 24-slot array (some hours may be 0)
+    const hourlyByReviewer = new Map<string, number[]>();
+    for (const row of todayHourlyRes.rows) {
+      if (EXCLUDED_USER_IDS.has(row.updated_by)) continue;
+      if (!hourlyByReviewer.has(row.updated_by)) {
+        hourlyByReviewer.set(row.updated_by, new Array(24).fill(0));
+      }
+      hourlyByReviewer.get(row.updated_by)![row.hour] = Number(row.count);
+    }
+    const today_hourly = Array.from(hourlyByReviewer.entries()).map(([user_id, hours]) => {
+      const member = memberByUserId(user_id);
+      return {
+        user_id,
+        display_name: member?.display_name ?? `User ${user_id}`,
+        slug:         member?.slug ?? user_id,
+        hours, // length 24, value at index h = count for that hour
+      };
+    });
+
+    return NextResponse.json({ ok: true, reviewers, totals, recent, today, today_hourly });
 
   } catch (err) {
     console.error("[/api/progress]", err);

@@ -43,13 +43,21 @@ type RecentRow = {
   updated_at:   string;
 };
 
+type TodayHourly = {
+  user_id:      string;
+  display_name: string;
+  slug:         string;
+  hours:        number[]; // length 24, value at index h = count for that hour
+};
+
 type ApiResponse = {
-  ok:        boolean;
-  error?:    string;
-  reviewers: Omit<Reviewer, "color">[];
-  totals:    { total_days: number; clean_days: number };
-  recent:    RecentRow[];
-  today:     TodayRow[];
+  ok:            boolean;
+  error?:        string;
+  reviewers:     Omit<Reviewer, "color">[];
+  totals:        { total_days: number; clean_days: number };
+  recent:        RecentRow[];
+  today:         TodayRow[];
+  today_hourly:  TodayHourly[];
 };
 
 // ---------- bar chart with hover ----------
@@ -148,48 +156,129 @@ function ActivityBarChart({ data, reviewers, maxBars }: { data: BarDatum[]; revi
   );
 }
 
-// Horizontal bar chart for today's per-teammate breakdown. Sorted descending
-// so the top performer is at the top. Falls back to an empty-state if nobody
-// has updated anything yet today.
-function TodayBarChart({ today, reviewers, total }: { today: TodayRow[]; reviewers: Reviewer[]; total: number }) {
-  if (today.length === 0) {
+// 24-hour stacked bar chart. X-axis = hour of day (00–23, server time),
+// Y-axis = ship-day updates, stacks coloured by teammate.
+function TodayHourlyChart({ hourly, reviewers, total }: { hourly: TodayHourly[]; reviewers: Reviewer[]; total: number }) {
+  const [hovered, setHovered] = useState<{ hour: number; x: number; y: number } | null>(null);
+
+  if (hourly.length === 0 || total === 0) {
     return (
       <div style={{ padding: "20px 16px", textAlign: "center", fontSize: 11, color: C_INK_FAINT, border: `1px dashed ${C_LINE}`, borderRadius: 4 }}>
         No cleaning activity yet today.
       </div>
     );
   }
-  const colorBySlug = new Map(reviewers.map(r => [r.slug, r.color] as const));
-  const colorByDisplayName = new Map(reviewers.map(r => [r.display_name, r.color] as const));
-  const max = Math.max(...today.map(t => t.count), 1);
-  const sorted = [...today].sort((a, b) => b.count - a.count);
+
+  const colorByUserId = new Map(reviewers.map(r => [r.user_id, r.color] as const));
+  const fallback = C_ACCENT;
+
+  // Sum per hour (across teammates) to find Y-axis max
+  const hourTotals = new Array(24).fill(0);
+  for (const h of hourly) {
+    for (let i = 0; i < 24; i++) hourTotals[i] += h.hours[i];
+  }
+  const maxHour = Math.max(...hourTotals, 1);
+  const CHART_H = 140;
 
   return (
-    <div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {sorted.map(row => {
-          const pct = (row.count / max) * 100;
-          const color = colorByDisplayName.get(row.display_name) ?? colorBySlug.get(row.user_id) ?? C_ACCENT;
-          const share = total > 0 ? ((row.count / total) * 100).toFixed(0) : "0";
+    <div style={{ position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", height: CHART_H, gap: 2 }}>
+        {Array.from({ length: 24 }, (_, h) => {
+          const slices = hourly
+            .map(r => ({ user_id: r.user_id, display_name: r.display_name, count: r.hours[h] }))
+            .filter(s => s.count > 0)
+            .sort((a, b) => b.count - a.count); // largest on bottom of stack
+          const totalForHour = hourTotals[h];
           return (
-            <div key={row.user_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 90, fontSize: 11, color: C_INK_DIM, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {row.display_name}
-              </div>
-              <div style={{ flex: 1, height: 18, background: C_LINE, borderRadius: 2, position: "relative" }}>
-                <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width 0.2s" }} />
-              </div>
-              <div style={{ width: 60, fontSize: 11, color: C_INK, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                {row.count.toLocaleString()}
-                <span style={{ fontSize: 9, color: C_INK_FAINT, marginLeft: 4, fontWeight: 400 }}>{share}%</span>
-              </div>
+            <div
+              key={h}
+              style={{ display: "flex", flexDirection: "column-reverse", flex: 1, cursor: "pointer", position: "relative", height: CHART_H, justifyContent: "flex-start" }}
+              onMouseEnter={e => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setHovered({ hour: h, x: rect.left + rect.width / 2, y: rect.top });
+              }}
+              onMouseLeave={() => setHovered(null)}
+            >
+              {totalForHour === 0 ? (
+                <div style={{ background: C_LINE, height: 2, borderRadius: "1px 1px 0 0" }} />
+              ) : (
+                slices.map(s => {
+                  const segH = Math.max(1, Math.round((s.count / maxHour) * CHART_H));
+                  return (
+                    <div
+                      key={s.user_id}
+                      style={{ background: colorByUserId.get(s.user_id) ?? fallback, height: segH }}
+                    />
+                  );
+                })
+              )}
             </div>
           );
         })}
       </div>
-      <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C_LINE}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 10, color: C_INK_FAINT, textTransform: "uppercase", letterSpacing: "0.1em" }}>Total today</span>
-        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 22, color: C_CLEAN, fontVariantNumeric: "tabular-nums" }}>{total.toLocaleString()}</span>
+
+      {/* X-axis labels — every 3 hours */}
+      <div style={{ display: "flex", gap: 2, marginTop: 4 }}>
+        {Array.from({ length: 24 }, (_, h) => (
+          <div key={h} style={{ flex: 1, fontSize: 8.5, color: C_INK_FAINT, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
+            {h % 3 === 0 ? String(h).padStart(2, "0") : ""}
+          </div>
+        ))}
+      </div>
+
+      {/* Hover tooltip */}
+      {hovered && (
+        <div style={{
+          position: "fixed", left: hovered.x, top: hovered.y - 8,
+          transform: "translate(-50%, -100%)", zIndex: 60,
+          background: C_PANEL, border: `1px solid ${C_LINE}`,
+          borderRadius: 4, padding: "8px 12px", fontSize: 11, color: C_INK,
+          pointerEvents: "none", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", minWidth: 150,
+        }}>
+          <div style={{ fontVariantNumeric: "tabular-nums", color: C_INK_DIM, fontSize: 10, marginBottom: 5 }}>
+            {String(hovered.hour).padStart(2, "0")}:00 – {String(hovered.hour).padStart(2, "0")}:59
+          </div>
+          {hourly
+            .map(r => ({ user_id: r.user_id, display_name: r.display_name, count: r.hours[hovered.hour] }))
+            .filter(s => s.count > 0)
+            .sort((a, b) => b.count - a.count)
+            .map(s => {
+              const color = colorByUserId.get(s.user_id) ?? fallback;
+              return (
+                <div key={s.user_id} style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 2 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />
+                    <span style={{ color: C_INK_DIM }}>{s.display_name}</span>
+                  </span>
+                  <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600, color }}>{s.count}</span>
+                </div>
+              );
+            })}
+          {hourTotals[hovered.hour] === 0 && <div style={{ color: C_INK_FAINT }}>No activity</div>}
+          <div style={{ borderTop: `1px solid ${C_LINE}`, marginTop: 5, paddingTop: 5, display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: C_INK_FAINT }}>Total</span>
+            <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{hourTotals[hovered.hour]}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Legend + total */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C_LINE}` }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+          {hourly.map(r => {
+            const color = colorByUserId.get(r.user_id) ?? fallback;
+            return (
+              <div key={r.user_id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                <span style={{ fontSize: 10, color: C_INK_DIM }}>{r.display_name}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 10, color: C_INK_FAINT, textTransform: "uppercase", letterSpacing: "0.1em" }}>Total today</span>
+          <span style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 20, color: C_CLEAN, fontVariantNumeric: "tabular-nums" }}>{total.toLocaleString()}</span>
+        </div>
       </div>
     </div>
   );
@@ -476,13 +565,13 @@ export default function ProgressPage() {
             <ActivityBarChart data={barData30} reviewers={reviewers} maxBars={30} />
           </div>
 
-          {/* Today's ship-day updates — per-teammate breakdown */}
+          {/* Today's ship-day updates — hourly time-series, stacked by team mate */}
           <div>
-            <SectionLabel>Today — ship-days updated</SectionLabel>
+            <SectionLabel>Today — hourly activity</SectionLabel>
             <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, marginBottom: 14 }}>
-              Cleaning activity from 00:00 today (server time), by team mate
+              Ship-days updated 00:00 → 23:59 today (server time), stacked by team mate
             </div>
-            <TodayBarChart today={data.today} reviewers={reviewers} total={todayTotal} />
+            <TodayHourlyChart hourly={data.today_hourly ?? []} reviewers={reviewers} total={todayTotal} />
           </div>
 
           {reviewers.length === 0 && (
