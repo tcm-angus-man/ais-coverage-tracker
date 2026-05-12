@@ -148,11 +148,84 @@ function ActivityBarChart({ data, reviewers, maxBars }: { data: BarDatum[]; revi
   );
 }
 
+// Horizontal bar chart for today's per-teammate breakdown. Sorted descending
+// so the top performer is at the top. Falls back to an empty-state if nobody
+// has updated anything yet today.
+function TodayBarChart({ today, reviewers, total }: { today: TodayRow[]; reviewers: Reviewer[]; total: number }) {
+  if (today.length === 0) {
+    return (
+      <div style={{ padding: "20px 16px", textAlign: "center", fontSize: 11, color: C_INK_FAINT, border: `1px dashed ${C_LINE}`, borderRadius: 4 }}>
+        No cleaning activity yet today.
+      </div>
+    );
+  }
+  const colorBySlug = new Map(reviewers.map(r => [r.slug, r.color] as const));
+  const colorByDisplayName = new Map(reviewers.map(r => [r.display_name, r.color] as const));
+  const max = Math.max(...today.map(t => t.count), 1);
+  const sorted = [...today].sort((a, b) => b.count - a.count);
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {sorted.map(row => {
+          const pct = (row.count / max) * 100;
+          const color = colorByDisplayName.get(row.display_name) ?? colorBySlug.get(row.user_id) ?? C_ACCENT;
+          const share = total > 0 ? ((row.count / total) * 100).toFixed(0) : "0";
+          return (
+            <div key={row.user_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 90, fontSize: 11, color: C_INK_DIM, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {row.display_name}
+              </div>
+              <div style={{ flex: 1, height: 18, background: C_LINE, borderRadius: 2, position: "relative" }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width 0.2s" }} />
+              </div>
+              <div style={{ width: 60, fontSize: 11, color: C_INK, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                {row.count.toLocaleString()}
+                <span style={{ fontSize: 9, color: C_INK_FAINT, marginLeft: 4, fontWeight: 400 }}>{share}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C_LINE}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 10, color: C_INK_FAINT, textTransform: "uppercase", letterSpacing: "0.1em" }}>Total today</span>
+        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 22, color: C_CLEAN, fontVariantNumeric: "tabular-nums" }}>{total.toLocaleString()}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function ProgressPage() {
   const [data, setData]       = useState<ApiResponse | null>(null);
   const [error, setError]     = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [me, setMe]           = useState<{ role: string } | null>(null);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [rebuildMsg, setRebuildMsg] = useState<string | null>(null);
   const timerRef              = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me", { credentials: "include" })
+      .then(r => r.json())
+      .then(j => { if (j.ok) setMe({ role: j.role }); })
+      .catch(() => {});
+  }, []);
+
+  async function rebuildSnapshot() {
+    setRebuilding(true);
+    setRebuildMsg(null);
+    try {
+      const r = await fetch("/api/snapshot/rebuild", { method: "POST", credentials: "include" });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error ?? "rebuild failed");
+      setRebuildMsg(`Snapshot rebuilt at ${new Date(j.generated_at).toLocaleTimeString()}`);
+      load(); // refresh progress data too
+    } catch (e) {
+      setRebuildMsg(`Failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRebuilding(false);
+    }
+  }
 
   function clearTimer() {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
@@ -255,8 +328,31 @@ export default function ProgressPage() {
         <KpiStat value={data.totals.total_days.toLocaleString()} label="Total ship-days" />
         <KpiStat value={`${cleanPct}%`} label="Clean rate" color={cleanPct > 50 ? C_CLEAN : C_ACCENT} />
         <KpiStat value={String(reviewers.length)} label="Active reviewers" />
-        <div style={{ marginLeft: "auto", fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums" }}>
-          Refreshes every 60 s
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
+          {rebuildMsg && (
+            <span style={{ fontSize: 10, color: rebuildMsg.startsWith("Failed") ? "#d35454" : C_CLEAN, fontVariantNumeric: "tabular-nums" }}>
+              {rebuildMsg}
+            </span>
+          )}
+          {me?.role === "assigner" && (
+            <button
+              onClick={rebuildSnapshot}
+              disabled={rebuilding}
+              style={{
+                fontSize: 10, padding: "5px 12px", borderRadius: 3,
+                background: rebuilding ? C_LINE : C_ACCENT,
+                color: rebuilding ? C_INK_FAINT : "#1a1207",
+                border: "none", cursor: rebuilding ? "default" : "pointer",
+                fontFamily: "inherit", fontWeight: 600,
+                textTransform: "uppercase", letterSpacing: "0.1em",
+              }}
+            >
+              {rebuilding ? "Rebuilding…" : "Rebuild snapshot"}
+            </button>
+          )}
+          <span style={{ fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums" }}>
+            Refreshes every 60 s
+          </span>
         </div>
       </div>
 
@@ -378,6 +474,15 @@ export default function ProgressPage() {
               Grouped by when each mapmaker actually did the cleaning
             </div>
             <ActivityBarChart data={barData30} reviewers={reviewers} maxBars={30} />
+          </div>
+
+          {/* Today's ship-day updates — per-teammate breakdown */}
+          <div>
+            <SectionLabel>Today — ship-days updated</SectionLabel>
+            <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, marginBottom: 14 }}>
+              Cleaning activity from 00:00 today (server time), by team mate
+            </div>
+            <TodayBarChart today={data.today} reviewers={reviewers} total={todayTotal} />
           </div>
 
           {reviewers.length === 0 && (

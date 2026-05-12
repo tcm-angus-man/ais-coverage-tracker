@@ -19,9 +19,9 @@ const LIVE_DATA_TEAM = new Set(["nick", "ai-ai", "kim"]);
 // Distinct colour per live-data cleaner so the dot signals who owns it at a glance.
 // Other cleaners share a neutral amber dot.
 const ASSIGNEE_COLOR: Record<string, string> = {
-  "nick":  "#5fa8f7", // blue
-  "kim":   "#d97bd9", // magenta
-  "ai-ai": "#7ad6a8", // green
+  "nick":  "#7ad6a8", // green
+  "kim":   "#e8c170", // yellow
+  "ai-ai": "#5fa8f7", // blue
 };
 const ASSIGNEE_COLOR_DEFAULT = "#e8c170"; // amber
 
