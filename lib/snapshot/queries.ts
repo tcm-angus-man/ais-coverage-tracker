@@ -198,14 +198,13 @@ export async function fetchSilverCells(pool: Pool): Promise<SilverCellRow[]> {
       COALESCE(ass.delta_distance_count, 0)::int AS dd,
       COALESCE(ass.spike_count, 0)::int          AS sp,
       COALESCE(ass.overland_count, 0)::int       AS ol,
-      -- u = 1 when a human (not data-platform) has actually modified the row
-      -- since creation. Both conditions matter: data-platform may write the
-      -- initial row with updated_by set, but updated_at == created_at means
-      -- no human follow-up has happened yet.
+      -- u = 1 when a human (not data-platform) has modified the row.
+      -- ais_silver_summary has no created_at column, so we rely on updated_by
+      -- alone — data-platform tags every row it inserts, so anything else
+      -- means a human touched it.
       (CASE
         WHEN ass.updated_by IS NOT NULL
          AND ass.updated_by NOT IN ('data-platform')
-         AND ass.updated_at IS DISTINCT FROM ass.created_at
         THEN 1 ELSE 0
       END)::int AS u
     FROM ais_silver_summary ass
