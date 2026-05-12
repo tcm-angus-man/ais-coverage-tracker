@@ -215,8 +215,10 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const status = a.status ?? "queued";
       if (status === "done") continue; // hide dots once cleaning is finished
       const assignee = a.assignee ?? "";
-      const start = new Date(a.date_start), end = new Date(a.date_end);
-      for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      // Parse as UTC midnight to avoid DST shifts (e.g. Oct 31 / Mar 31 in GMT+1
+      // would otherwise resolve to the previous day via toISOString()).
+      const start = new Date(a.date_start + "T00:00:00Z"), end = new Date(a.date_end + "T00:00:00Z");
+      for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
         map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status, id: a.id, notes: a.notes });
       }
     }
