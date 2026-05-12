@@ -4,6 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 
+// These three tabs share one CoverageShell instance that must not be unmounted
+// between switches — the blob payload (160 MB decompressed) lives in its state.
+// We intercept clicks and use pushState so Next.js never navigates away from
+// the current page component tree.
+const SHELL_HREFS = new Set(["/coverage", "/cleanliness", "/merged"]);
+
 const TABS = [
   { href: "/coverage",    label: "Coverage",    n: "01" },
   { href: "/cleanliness", label: "Cleanliness", n: "02" },
@@ -38,10 +44,27 @@ export default function Nav() {
       <nav style={{ display: "flex", alignItems: "stretch", flex: 1 }}>
         {TABS.map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
+          const isShellTab = SHELL_HREFS.has(tab.href);
+          // Shell tabs (Coverage/Cleanliness/Merged): pushState keeps the component
+          // tree alive so CoverageLoader never unmounts and never re-fetches the blob.
+          // Only intercept (suppress full navigation) when already on a shell page —
+          // if CoverageShell is mounted, pushState keeps it alive. If not, let
+          // Next.js navigate normally so it mounts fresh.
+          const currentlyOnShell = SHELL_HREFS.has(pathname);
+          const handleClick = isShellTab && currentlyOnShell
+            ? (e: React.MouseEvent) => {
+                e.preventDefault();
+                if (!active) {
+                  window.history.pushState(null, "", tab.href);
+                  window.dispatchEvent(new CustomEvent("shellnavigate", { detail: tab.href }));
+                }
+              }
+            : undefined;
           return (
             <Link
               key={tab.href}
               href={tab.href}
+              onClick={handleClick}
               style={{
                 display: "flex",
                 flexDirection: "column",

@@ -561,7 +561,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const dateEnd   = activeDates[c1];
     if (dateStart && dateEnd) {
       // Single-cell click on an assigned day — open edit modal for anyone, not just assigners
-      const isSingleCell = r0 === drag.r1 && c0 === drag.c1;
+      const isSingleCell = drag.r0 === drag.r1 && drag.c0 === drag.c1;
       const existing = isSingleCell ? assignedCells.get(`${ship.mmsi}|${dateStart}`) : undefined;
       if (existing) {
         setEditModal({ assignment: existing, ship, dateStart, dateEnd });

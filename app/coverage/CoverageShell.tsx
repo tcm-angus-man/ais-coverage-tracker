@@ -60,6 +60,17 @@ export default function CoverageShell({ initialMode }: { initialMode: ShellMode 
     if (m && m !== mode) setMode(m);
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sync when Nav intercepted a click and did pushState (doesn't update usePathname)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const href = (e as CustomEvent<string>).detail;
+      const m = MODE_FOR_PATH[href];
+      if (m) setMode(m);
+    };
+    window.addEventListener("shellnavigate", handler);
+    return () => window.removeEventListener("shellnavigate", handler);
+  }, []);
+
   const meta = TAB_META[mode];
 
   // Push URL when user clicks a tab, without a full page navigation

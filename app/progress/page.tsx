@@ -194,7 +194,7 @@ function TodayHourlyChart({ hourly, reviewers, total }: { hourly: TodayHourly[];
           const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
           const relX = (e.clientX - rect.left) / rect.width * W;
           const h = Math.round(((relX - PAD_L) / chartW) * 23);
-          if (h >= 0 && h <= 23) setHovered({ hour: h, x: e.clientX, y: rect.top + PAD_T });
+          if (h >= 0 && h <= 23) setHovered({ hour: h, x: e.clientX, y: e.clientY });
           else setHovered(null);
         }}
         onMouseLeave={() => setHovered(null)}
