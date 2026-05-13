@@ -189,7 +189,7 @@ function TodayHourlyChart({ hourly, reviewers, total }: { hourly: TodayHourly[];
     <div style={{ position: "relative" }}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: "100%", height: H, display: "block", overflow: "visible" }}
+        style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
         onMouseMove={e => {
           const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
           const relX = (e.clientX - rect.left) / rect.width * W;
@@ -531,7 +531,7 @@ export default function ProgressPage() {
         </div>
 
         {/* Right: charts + today table */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", padding: "20px 36px", gap: 32 }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "auto", padding: "20px 36px", gap: 32 }}>
 
           {/* Today's breakdown table */}
           <div>
@@ -598,7 +598,7 @@ export default function ProgressPage() {
           </div>
 
           {/* Today's ship-day updates — hourly time-series, stacked by team mate */}
-          <div>
+          <div style={{ minWidth: 0, width: "100%" }}>
             <SectionLabel>Today — hourly activity</SectionLabel>
             <div style={{ fontSize: 10, color: C_INK_FAINT, marginTop: 4, marginBottom: 14 }}>
               Ship-days updated 00:00 → 23:59 today (server time), stacked by team mate

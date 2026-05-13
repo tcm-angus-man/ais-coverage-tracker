@@ -316,12 +316,54 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const pct = totalDays === 0 ? 0 : Math.round((cleanDays / totalDays) * 1000) / 10;
       return { ships: baseShipIdx.length, dates: silverDates.length, pct, label: "cleaned", withData, needsReview, missing };
     } else {
-      let withData = 0, requested = 0, needsReview = 0, missing = 0;
+      // COVID window: days in this range with no legit coverage are excluded from denominator
+      const COVID_START = "2020-03-01";
+      const COVID_END   = "2021-11-30";
+      const covidStartIdx = dates.findIndex(d => d >= COVID_START);
+      const covidEndIdx   = (() => { let i = dates.length - 1; while (i >= 0 && dates[i] > COVID_END) i--; return i; })();
+      const covidWindowLen = (covidStartIdx >= 0 && covidEndIdx >= covidStartIdx) ? covidEndIdx - covidStartIdx + 1 : 0;
+
+      // Returns the set of date indices (within COVID window) that are part of a qualifying
+      // contiguous run: ≥10 consecutive v>=1 days, anchored within 7 days of either boundary.
+      function qualifyingCovidIndices(si: number): Set<number> {
+        const qualifying = new Set<number>();
+        if (covidWindowLen <= 0) return qualifying;
+        // Find all contiguous runs of v>=1 within the COVID window
+        let runStart = -1;
+        const flush = (runEnd: number) => {
+          if (runStart < 0) return;
+          const len = runEnd - runStart + 1;
+          const anchored =
+            (runStart - covidStartIdx) <= 7 ||
+            (covidEndIdx - runEnd)     <= 7;
+          if (len >= 10 && anchored) {
+            for (let i = runStart; i <= runEnd; i++) qualifying.add(i);
+          }
+          runStart = -1;
+        };
+        for (let d = covidStartIdx; d <= covidEndIdx; d++) {
+          const cell = voyage.cells[si][d];
+          if (cell && cell.v >= 1) {
+            if (runStart < 0) runStart = d;
+          } else {
+            flush(d - 1);
+          }
+        }
+        flush(covidEndIdx);
+        return qualifying;
+      }
+
+      let withData = 0, requested = 0, needsReview = 0, missing = 0, covidExcluded = 0;
       for (const si of baseShipIdx) {
+        const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(si) : null;
         for (let d = 0; d < dates.length; d++) {
           const cell = voyage.cells[si][d];
           const hasVoyage = cell && cell.t > 0;
           const hasVisible = cell && cell.v >= 1;
+          // Check if this day falls in COVID window and is not a qualifying run day
+          const inCovid = covidWindowLen > 0 && d >= covidStartIdx && d <= covidEndIdx;
+          const covidExclude = inCovid && !hasVisible && !(qualifiedCovidIdx?.has(d));
+          if (covidExclude) { covidExcluded++; continue; }
           if (!hasVisible) { missing++; } else { withData++; }
           if (hasVoyage) { requested++; }
           if (hasVisible && (cell.dw > cell.v || cell.na > cell.v)) needsReview++;
@@ -330,7 +372,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const total = withData + missing;
       const pct        = total     === 0 ? 0 : Math.round((withData / total)     * 1000) / 10;
       const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested };
+      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded };
     }
   }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates]);
 
@@ -603,7 +645,14 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         <KpiStat value={kpis.needsReview.toLocaleString()} label="needs review" color={kpis.needsReview > 0 ? C_DW : C_INK_FAINT} />
         <KpiStat value={kpis.missing.toLocaleString()} label={isSilver ? "no data" : "no voyage"} color={C_INK_FAINT} />
         <KpiDivider />
-        <KpiStat value={`${kpis.pct}%`} label={kpis.label} color={kpis.pct > 50 ? C_VISIBLE : C_DW} />
+        <KpiStat
+          value={`${kpis.pct}%`}
+          label={kpis.label}
+          color={kpis.pct > 50 ? C_VISIBLE : C_DW}
+          tooltip={!isSilver && (kpis.covidExcluded ?? 0) > 0
+            ? `COVID adjustment: ${(kpis.covidExcluded ?? 0).toLocaleString()} ship-days in Mar 2020 – Nov 2021 excluded from the denominator. Days in that window are only counted for ships with a continuous run of ≥10 days of visible-on-globe coverage anchored to either end of the period.`
+            : undefined}
+        />
         {!isSilver && (
           <KpiStat
             value={`${kpis.requestPct}%`}
@@ -775,11 +824,33 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
 
 // ---- sub-components ----
 
-function KpiStat({ value, label, color }: { value: string; label: string; color?: string }) {
+function KpiStat({ value, label, color, tooltip }: { value: string; label: string; color?: string; tooltip?: string }) {
+  const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
   return (
-    <div>
+    <div style={{ position: "relative" }}>
       <div style={{ fontFamily: "Fraunces, serif", fontWeight: 300, fontSize: 26, letterSpacing: "-0.02em", color: color ?? C_INK, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.16em", color: C_INK_FAINT, marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.16em", color: C_INK_FAINT, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+        {label}
+        {tooltip && (
+          <span
+            onMouseEnter={e => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setTip({ x: r.left + r.width / 2, y: r.top }); }}
+            onMouseLeave={() => setTip(null)}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 12, height: 12, borderRadius: "50%", border: `1px solid ${C_INK_FAINT}`, fontSize: 8, color: C_INK_FAINT, cursor: "default", flexShrink: 0, lineHeight: 1 }}
+          >i</span>
+        )}
+      </div>
+      {tip && tooltip && (
+        <div style={{
+          position: "fixed", left: tip.x, top: tip.y - 8,
+          transform: "translate(-50%, -100%)", zIndex: 60,
+          background: C_PANEL, border: `1px solid ${C_LINE}`,
+          borderRadius: 4, padding: "10px 14px", fontSize: 11, color: C_INK,
+          pointerEvents: "none", boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+          maxWidth: 320, lineHeight: 1.55,
+        }}>
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
