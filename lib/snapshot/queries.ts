@@ -114,11 +114,22 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
       GROUP BY s.id, s.mmsi
     ),
     voyage_days AS (
+      -- Categories are mutually exclusive in priority order so v + na + dw + need_process = t.
+      -- Precedence: no-AIS > details-wrong > visible > need-process. A voyage
+      -- with a deleted print or no data is "no AIS" regardless of other flags.
       SELECT
         s.mmsi,
         d::date AS day,
         COUNT(*)::int AS t,
-        COUNT(*) FILTER (WHERE v.visible_on_globe = TRUE)::int AS v,
+        COUNT(*) FILTER (
+          WHERE NOT (
+                v.route_file_location IS NULL
+             OR v.globe_customer_notification = 'No data available'
+             OR EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = TRUE)
+          )
+          AND NOT (v.globe_customer_notification = 'Details are wrong')
+          AND v.visible_on_globe = TRUE
+        )::int AS v,
         COUNT(*) FILTER (
           WHERE v.route_file_location IS NULL
              OR v.globe_customer_notification = 'No data available'
@@ -128,11 +139,12 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
              )
         )::int AS na,
         COUNT(*) FILTER (
-          WHERE v.globe_customer_notification = 'Details are wrong'
-             OR EXISTS (
-               SELECT 1 FROM prints p
-               WHERE p.voyage_id = v.id AND p.is_deleted = TRUE
-             )
+          WHERE NOT (
+                v.route_file_location IS NULL
+             OR v.globe_customer_notification = 'No data available'
+             OR EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = TRUE)
+          )
+          AND v.globe_customer_notification = 'Details are wrong'
         )::int AS dw
       FROM voyages v
       JOIN ships s ON s.id = v.ship_id
