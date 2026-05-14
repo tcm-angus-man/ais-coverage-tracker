@@ -26,3 +26,18 @@ export const AUDIT_LOG_COLUMNS = [
   "before",
   "after",
 ] as const;
+
+// Ship-level reference data: tier classification + in-service window.
+// IMO-keyed because IMO is permanent; MMSI fanout happens at snapshot time.
+// Dates are YYYY-MM-DD; blank service_start = active before voyage window;
+// blank service_end = still in service.
+export const SHIP_METADATA_COLUMNS = [
+  "ship_name",
+  "cruise_line",
+  "imo_number",
+  "ship_count",
+  "cruise_type",
+  "service_start",
+  "service_end",
+  "tier",
+] as const;

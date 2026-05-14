@@ -1,0 +1,653 @@
+ship_name,cruise_line,imo_number,ship_count,cruise_type,service_start,service_end,tier
+FOUR SEASONS I,Four Seasons,9988255,1,Luxury Cruise,2026-03-20,,4
+DISNEY DESTINY,Disney Cruise Line,9834741,1,Ocean Cruise,2025-11-20,,1
+ICON OF THE SEAS,Royal Caribbean,9829930,1,Ocean Cruise,2024-01-27,,1
+CELEBRITY XCEL,Celebrity Cruises,9884136,1,Ocean Cruise,2025-11-18,,1
+DISNEY TREASURE,Disney Cruise Line,9834753,1,Ocean Cruise,2024-12-21,,1
+MEIN SCHIFF RELAX,TUI Cruises,9862657,1,Ocean Cruise,2025-02-07,,1
+STAR OF THE SEAS,Royal Caribbean,9829942,1,Ocean Cruise,2025-08-31,,1
+SILVER NOVA,Silversea Cruises,9886213,1,Luxury Cruise,2023-08-14,,2
+STAR PRINCESS,Princess Cruises,9863120,2,Ocean Cruise,2025-10-04,,1
+ENCHANTED PRINCESS,Princess Cruises,9807126,1,Ocean Cruise,2021-11-10,,1
+MEIN SCHIFF 7,TUI Cruises,9851189,1,Ocean Cruise,2024-06-12,,1
+QUEEN ANNE,Cunard,9839399,1,Ocean Cruise,2024-05-03,,1
+IONA,P&O UK (P&O Cruises),9826548,2,Ocean Cruise,2021-05-16,,1
+MS ROTTERDAM,Holland America,9837470,1,Ocean Cruise,2021-10-20,,1
+SUN PRINCESS,Princess Cruises,9863118,1,Ocean Cruise,2024-02-28,,1
+DISNEY WISH,Disney Cruise Line,9834739,1,Ocean Cruise,2022-07-14,,1
+CELEBRITY EDGE,Celebrity Cruises,9812705,1,Ocean Cruise,2018-12-09,,1
+DISCOVERY PRINCESS,Princess Cruises,9837468,1,Ocean Cruise,2022-03-27,,1
+BRILLIANT LADY,Virgin Voyages,9870654,1,Ocean Cruise,2025-08-21,,1
+MSC WORLD AMERICA,MSC Cruises,9837432,1,Ocean Cruise,2025-04-12,,1
+ARVIA,P&O UK (P&O Cruises),9849693,2,Ocean Cruise,2022-12-23,,1
+MSC WORLD EUROPA,MSC Cruises,9837420,1,Ocean Cruise,2022-12-20,,1
+CARNIVAL JUBILEE,Carnival Cruise Line,9851737,1,Ocean Cruise,2023-12-23,,1
+NORWEGIAN BLISS,Norwegian Cruise Line,9751509,1,Ocean Cruise,2018-06-02,,1
+SKY PRINCESS,Princess Cruises,9802396,1,Ocean Cruise,2019-10-20,,1
+VIKING NEPTUNE,Viking Ocean (Viking Cruises),9845910,1,Ocean Cruise,2022-12-22,,2
+NORWEGIAN AQUA,Norwegian Cruise Line,9824007,1,Ocean Cruise,2025-03-24,,1
+CELEBRITY ASCENT,Celebrity Cruises,9838400,1,Ocean Cruise,2023-12-03,,1
+CARNIVAL MARDI GRAS,Carnival Cruise Line,9837444,1,Ocean Cruise,2021-07-31,,1
+VALIANT LADY,Virgin Voyages,9805336,1,Ocean Cruise,2022-03-18,,1
+NORWEGIAN ESCAPE,Norwegian Cruise Line,9677076,1,Ocean Cruise,2015-11-09,,1
+HARMONY OF THE SEAS,Royal Caribbean,9682875,1,Ocean Cruise,2016-05-29,,1
+CELEBRITY BEYOND,Celebrity Cruises,9838395,1,Ocean Cruise,2022-04-27,,1
+RESILIENT LADY,Virgin Voyages,9805348,1,Ocean Cruise,2023-05-14,,1
+MS NIEUW STATENDAM,Holland America,9767106,1,Ocean Cruise,2018-12-05,,1
+MS KONINGSDAM,Holland America,9692557,1,Ocean Cruise,2016-04-08,,1
+WONDER OF THE SEAS,Royal Caribbean,9838345,1,Ocean Cruise,2022-03-04,,1
+CARNIVAL BREEZE,Carnival Cruise Line,9555723,1,Ocean Cruise,,,1
+EXPLORA II,MSC Explora Journeys,9869887,1,Luxury Cruise,2024-09-16,,2
+MSC EURIBIA,MSC Cruises,9901544,1,Ocean Cruise,2023-06-03,,1
+COSTA TOSCANA,Costa Cruises,9781891,1,Ocean Cruise,2022-03-05,,1
+NORWEGIAN ENCORE,Norwegian Cruise Line,9751511,1,Ocean Cruise,2019-11-02,,1
+ODYSSEY OF THE SEAS,Royal Caribbean,9795737,1,Ocean Cruise,2021-07-31,,1
+CARNIVAL LIBERTY,Carnival Cruise Line,9278181,1,Ocean Cruise,,,1
+NORWEGIAN STAR,Norwegian Cruise Line,9195157,1,Ocean Cruise,,,1
+QUEEN MARY 2,Cunard,9241061,1,Ocean Cruise,,,1
+UTOPIA OF THE SEAS,Royal Caribbean,9880001,1,Ocean Cruise,2024-07-15,,1
+SPIRIT OF ADVENTURE,Saga Ocean Cruises (Saga Cruises),9818084,1,Ocean Cruise,2021-07-26,,2
+CARNIVAL VISTA,Carnival Cruise Line,9692569,1,Ocean Cruise,2016-05-01,,1
+CELEBRITY EQUINOX,Celebrity Cruises,9372456,1,Ocean Cruise,,,1
+NORWEGIAN PRIMA,Norwegian Cruise Line,9823986,1,Ocean Cruise,2022-08-27,,1
+CARNIVAL CELEBRATION,Carnival Cruise Line,9837456,1,Ocean Cruise,2022-11-06,,1
+AZURA,P&O UK (P&O Cruises),9424883,1,Ocean Cruise,,,1
+NORWEGIAN JEWEL,Norwegian Cruise Line,9304045,1,Ocean Cruise,,,1
+RUBY PRINCESS,Princess Cruises,9378462,1,Ocean Cruise,,,1
+CELEBRITY REFLECTION,Celebrity Cruises,9506459,1,Ocean Cruise,,,1
+NORWEGIAN BREAKAWAY,Norwegian Cruise Line,9606912,1,Ocean Cruise,,,1
+BRITANNIA,P&O UK (P&O Cruises),9614036,2,Ocean Cruise,2015-03-14,,1
+MSC SEASIDE,MSC Cruises,9745366,1,Ocean Cruise,2017-12-21,,1
+CARNIVAL PRIDE,Carnival Cruise Line,9223954,1,Ocean Cruise,,,1
+NORWEGIAN JADE,Norwegian Cruise Line,9304057,1,Ocean Cruise,,,1
+VENTURA,P&O UK (P&O Cruises),9333175,1,Ocean Cruise,,,1
+EMERALD PRINCESS,Princess Cruises,9333151,1,Ocean Cruise,,,1
+SYMPHONY OF THE SEAS,Royal Caribbean,9744001,1,Ocean Cruise,2018-04-07,,1
+ANTHEM OF THE SEAS,Royal Caribbean,9656101,1,Ocean Cruise,2015-04-22,,1
+MSC SEASHORE,MSC Cruises,9843792,1,Ocean Cruise,2021-08-01,,1
+ALLURE OF THE SEAS,Royal Caribbean,9383948,1,Ocean Cruise,,,1
+ADVENTURE OF THE SEAS,Royal Caribbean,9167227,1,Ocean Cruise,,,1
+MSC GRANDIOSA,MSC Cruises,9803613,1,Ocean Cruise,2019-11-09,,1
+CARNIVAL GLORY,Carnival Cruise Line,9198367,1,Ocean Cruise,,,1
+OCEANA,P&O UK (P&O Cruises),9169550,2,Ocean Cruise,,2020-07-21,1
+DISNEY FANTASY,Disney Cruise Line,9445590,1,Ocean Cruise,,,1
+DISNEY MAGIC,Disney Cruise Line,9126807,1,Ocean Cruise,,,1
+CARNIVAL CONQUEST,Carnival Cruise Line,9198355,1,Ocean Cruise,,,1
+CARNIVAL DREAM,Carnival Cruise Line,9378474,1,Ocean Cruise,,,1
+GRAND PRINCESS,Princess Cruises,9104005,1,Ocean Cruise,,,1
+CARIBBEAN PRINCESS,Princess Cruises,9215490,1,Ocean Cruise,,,1
+NORWEGIAN EPIC,Norwegian Cruise Line,9410569,1,Ocean Cruise,,,1
+NORWEGIAN GETAWAY,Norwegian Cruise Line,9606924,1,Ocean Cruise,,,1
+QUEEN ELIZABETH,Cunard,9477438,1,Ocean Cruise,,,1
+LIBERTY OF THE SEAS,Royal Caribbean,9330032,1,Ocean Cruise,,,1
+NORWEGIAN VIVA,Norwegian Cruise Line,9823998,1,Ocean Cruise,2023-08-03,,1
+COSTA SMERALDA,Costa Cruises,9781889,1,Ocean Cruise,2019-11-16,,1
+CARNIVAL HORIZON,Carnival Cruise Line,9767091,1,Ocean Cruise,2018-04-02,,1
+NORWEGIAN GEM,Norwegian Cruise Line,9355733,1,Ocean Cruise,,,1
+SEVEN SEAS GRANDEUR,Regent Seven Seas Cruises,9877444,2,Luxury Cruise,2023-11-18,,2
+MEIN SCHIFF 2,TUI Cruises,9783576,1,Ocean Cruise,2019-02-09,,1
+MSC DIVINA,MSC Cruises,9585285,1,Ocean Cruise,,,1
+AURORA,P&O UK (P&O Cruises),9169524,1,Ocean Cruise,,,1
+SCARLET LADY,Virgin Voyages,9804801,1,Ocean Cruise,2020-02-14,,1
+JEWEL OF THE SEAS,Royal Caribbean,9228356,1,Ocean Cruise,,,1
+REGAL PRINCESS,Princess Cruises,9584724,1,Ocean Cruise,,,1
+MSC ORCHESTRA,MSC Cruises,9320099,1,Ocean Cruise,,,1
+CARNIVAL FREEDOM,Carnival Cruise Line,9333149,1,Ocean Cruise,,,1
+DISNEY DREAM,Disney Cruise Line,9434254,1,Ocean Cruise,,,1
+CARNIVAL VALOR,Carnival Cruise Line,9236389,1,Ocean Cruise,,,1
+MSC VIRTUOSA,MSC Cruises,9803625,1,Ocean Cruise,2021-05-20,,1
+CELEBRITY APEX,Celebrity Cruises,9838383,1,Ocean Cruise,2020-02-04,,1
+ISLAND PRINCESS,Princess Cruises,9230402,1,Ocean Cruise,,,1
+AIDACOSMA,AIDA Cruises,9781877,1,Ocean Cruise,2022-02-26,,1
+NAVIGATOR OF THE SEAS,Royal Caribbean,9227508,1,Ocean Cruise,,,1
+VIKING VENUS,Viking Ocean (Viking Cruises),9833175,1,Ocean Cruise,2021-05-22,,2
+VIKING SKY,Viking Ocean (Viking Cruises),9650420,1,Ocean Cruise,2017-02-25,,2
+RITZ CARLTON ILMA,Ritz-Carlton Yacht Collection,9967586,1,Luxury Cruise,2024-09-19,,2
+MSC MERAVIGLIA,MSC Cruises,9760512,1,Ocean Cruise,2017-06-03,,1
+COSTA ATLANTICA,Costa Cruises,9187796,2,Ocean Cruise,2024-06-14,,1
+QUANTUM OF THE SEAS,Royal Caribbean,9549463,1,Ocean Cruise,,,1
+MS EURODAM,Holland America,9378448,1,Ocean Cruise,,,1
+CELEBRITY SILHOUETTE,Celebrity Cruises,9451094,1,Ocean Cruise,,,1
+CELEBRITY CONSTELLATION,Celebrity Cruises,9192399,1,Ocean Cruise,,,1
+CARNIVAL PANORAMA,Carnival Cruise Line,9802384,1,Ocean Cruise,2019-12-10,,1
+INDEPENDENCE OF THE SEAS,Royal Caribbean,9349681,1,Ocean Cruise,,,1
+CARNIVAL MAGIC,Carnival Cruise Line,9378486,1,Ocean Cruise,,,1
+AIDANOVA,AIDA Cruises,9781865,1,Ocean Cruise,2018-12-19,,1
+GRANDEUR OF THE SEAS,Royal Caribbean,9102978,1,Ocean Cruise,,,1
+CARNIVAL SUNSHINE,Carnival Cruise Line,9070058,2,Ocean Cruise,,,1
+MS VOLENDAM,Holland America,9156515,1,Ocean Cruise,,,1
+MS ZAANDAM,Holland America,9156527,1,Ocean Cruise,,,1
+MS NOORDAM,Holland America,9230115,1,Ocean Cruise,,,1
+NORWEGIAN DAWN,Norwegian Cruise Line,9195169,1,Ocean Cruise,,,1
+OASIS OF THE SEAS,Royal Caribbean,9383936,1,Ocean Cruise,,,1
+ENCHANTMENT OF THE SEAS,Royal Caribbean,9111802,1,Ocean Cruise,,,1
+MS NIEUW AMSTERDAM,Holland America,9378450,1,Ocean Cruise,,,1
+BRILLIANCE OF THE SEAS,Royal Caribbean,9195200,1,Ocean Cruise,,,1
+DISNEY WONDER,Disney Cruise Line,9126819,1,Ocean Cruise,,,1
+VIKING ORION,Viking Ocean (Viking Cruises),9796250,1,Ocean Cruise,2018-06-14,,2
+CARNIVAL MIRACLE,Carnival Cruise Line,9237357,1,Ocean Cruise,,,1
+SPIRIT OF DISCOVERY,Saga Ocean Cruises (Saga Cruises),9802683,1,Ocean Cruise,2019-07-05,,2
+SEVEN SEAS EXPLORER,Regent Seven Seas Cruises,9703150,1,Luxury Cruise,2016-07-13,,2
+CELEBRITY SUMMIT,Celebrity Cruises,9192387,1,Ocean Cruise,,,1
+CARNIVAL IMAGINATION,Carnival Cruise Line,9053878,1,Ocean Cruise,,2020-03-15,1
+MS OOSTERDAM,Holland America,9221281,1,Ocean Cruise,,,1
+MS WESTERDAM,Holland America,9226891,1,Ocean Cruise,,,1
+CARNIVAL LEGEND,Carnival Cruise Line,9224726,2,Ocean Cruise,,,1
+VIKING SEA,Viking Ocean (Viking Cruises),9725421,1,Ocean Cruise,2016-04-03,,2
+VIKING JUPITER,Viking Ocean (Viking Cruises),9796262,1,Ocean Cruise,2019-02-14,,2
+MS ZUIDERDAM,Holland America,9221279,1,Ocean Cruise,,,1
+FREEDOM OF THE SEAS,Royal Caribbean,9304033,1,Ocean Cruise,,,1
+VIKING VELA,Viking Ocean (Viking Cruises),9852432,1,Ocean Cruise,2024-12-12,,2
+CORAL PRINCESS,Princess Cruises,9229659,1,Ocean Cruise,,,1
+SEVEN SEAS SPLENDOR,Regent Seven Seas Cruises,9807085,1,Luxury Cruise,2020-02-01,,2
+VISION OF THE SEAS,Royal Caribbean,9116876,1,Ocean Cruise,,,1
+CARNIVAL FANTASY,Carnival Cruise Line,8700773,1,Ocean Cruise,,2020-07-15,1
+EXPLORER OF THE SEAS,Royal Caribbean,9161728,1,Ocean Cruise,,,1
+CARNIVAL SPLENDOR,Carnival Cruise Line,9333163,1,Ocean Cruise,,,1
+PRIDE OF AMERICA,Norwegian Cruise Line,9209221,1,Ocean Cruise,,,1
+MARINER OF THE SEAS,Royal Caribbean,9227510,1,Ocean Cruise,,,1
+CELEBRITY MILLENNIUM,Celebrity Cruises,9189419,1,Ocean Cruise,,,1
+MSC PREZIOSA,MSC Cruises,9595321,1,Ocean Cruise,,,1
+NORWEGIAN SKY,Norwegian Cruise Line,9128532,1,Ocean Cruise,,,1
+ARCADIA,P&O UK (P&O Cruises),9226906,1,Ocean Cruise,,,1
+MSC POESIA,MSC Cruises,9387073,1,Ocean Cruise,,,1
+SERENADE OF THE SEAS,Royal Caribbean,9228344,1,Ocean Cruise,,,1
+SEABOURN OVATION,Seabourn Cruises,9764958,1,Luxury Cruise,2018-05-11,,2
+SILVER MUSE,Silversea Cruises,9784350,1,Luxury Cruise,2018-04-17,,2
+ROYAL PRINCESS,Princess Cruises,9584712,1,Ocean Cruise,,,1
+NORWEGIAN SPIRIT,Norwegian Cruise Line,9141065,1,Ocean Cruise,,,1
+CROWN PRINCESS,Princess Cruises,9293399,1,Ocean Cruise,,,1
+CELEBRITY ECLIPSE,Celebrity Cruises,9404314,1,Ocean Cruise,,,1
+CELEBRITY INFINITY,Celebrity Cruises,9189421,1,Ocean Cruise,,,1
+AZAMARA QUEST,Azamara Cruises,9210218,2,Ocean Cruise,,,2
+SILVER RAY,Silversea Cruises,9886225,1,Luxury Cruise,2024-06-15,,2
+CARNIVAL ELATION,Carnival Cruise Line,9118721,1,Ocean Cruise,,,1
+NORWEGIAN PEARL,Norwegian Cruise Line,9342281,1,Ocean Cruise,,,1
+OCEANIA VISTA,Oceania Cruises,9876957,1,Ocean Cruise,2023-04-14,,2
+VIKING MARS,Viking Ocean (Viking Cruises),9833187,1,Ocean Cruise,2022-05-28,,2
+DIAMOND PRINCESS,Princess Cruises,9228198,2,Ocean Cruise,,,1
+QUEEN VICTORIA,Cunard,9320556,1,Ocean Cruise,,,1
+AZAMARA JOURNEY,Azamara Cruises,9200940,2,Ocean Cruise,,,2
+OVATION OF THE SEAS,Royal Caribbean,9697753,1,Ocean Cruise,2016-04-14,,1
+COSTA DIADEMA,Costa Cruises,9636888,1,Ocean Cruise,,,1
+OCEANIA ALLURA,Oceania Cruises,9876969,1,Ocean Cruise,2025-07-18,,2
+RADIANCE OF THE SEAS,Royal Caribbean,9195195,1,Ocean Cruise,,,1
+CARNIVAL ECSTASY,Carnival Cruise Line,8711344,1,Ocean Cruise,,2022-10-15,1
+SPECTRUM OF THE SEAS,Royal Caribbean,9778856,2,Ocean Cruise,2019-04-18,,1
+NORWEGIAN SUN,Norwegian Cruise Line,9218131,1,Ocean Cruise,,,1
+MEIN SCHIFF 1,TUI Cruises,9783564,1,Ocean Cruise,2018-04-27,,1
+CELEBRITY SOLSTICE,Celebrity Cruises,9362530,1,Ocean Cruise,,,1
+SILVER DAWN,Silversea Cruises,9857937,1,Luxury Cruise,2022-03-18,,2
+MSC MUSICA,MSC Cruises,9320087,1,Ocean Cruise,,,1
+CARNIVAL SPIRIT,Carnival Cruise Line,9188647,2,Ocean Cruise,,,1
+BOREALIS,Fred Olsen Cruise Lines,9122552,2,Ocean Cruise,,,2
+EXPLORA I,MSC Explora Journeys,9869875,1,Luxury Cruise,2023-07-17,,2
+RHAPSODY OF THE SEAS,Royal Caribbean,9116864,1,Ocean Cruise,,,1
+MEIN SCHIFF 6,TUI Cruises,9753208,1,Ocean Cruise,2017-05-12,,1
+SILVER MOON,Silversea Cruises,9838618,1,Luxury Cruise,2021-06-18,,2
+MS DREAM CHARMING,Foresee Cruises China,9150913,2,Ocean Cruise,,2020-11-01,4
+MSC SEAVIEW,MSC Cruises,9745378,1,Ocean Cruise,2018-06-09,,1
+AIDAPERLA,AIDA Cruises,9636967,1,Ocean Cruise,2017-06-01,,1
+VIKING STAR,Viking Ocean (Viking Cruises),9650418,1,Ocean Cruise,2015-04-11,,2
+MSC MAGNIFICA,MSC Cruises,9387085,1,Ocean Cruise,,,1
+VOYAGER OF THE SEAS,Royal Caribbean,9161716,1,Ocean Cruise,,,1
+BOLETTE,Fred Olsen Cruise Lines,9188037,2,Ocean Cruise,,,2
+BALMORAL,Fred Olsen Cruise Lines,8506294,1,Ocean Cruise,,,2
+CARNIVAL ENCOUNTER,Carnival Cruise Line,9192363,3,Ocean Cruise,,,1
+CELEBRITY FLORA,Celebrity Cruises,9837925,1,Ocean Cruise,2019-06-30,,1
+SEABOURN ENCORE,Seabourn Cruises,9731171,1,Luxury Cruise,2017-01-07,,2
+VIKING SATURN,Viking Ocean (Viking Cruises),9845922,1,Ocean Cruise,2023-05-02,,2
+CARNIVAL PARADISE,Carnival Cruise Line,9120877,1,Ocean Cruise,,,1
+CARNIVAL FIRENZE,Carnival Cruise Line,9801691,2,Ocean Cruise,2021-07-04,,1
+MSC FANTASIA,MSC Cruises,9359791,1,Ocean Cruise,,,1
+MSC SINFONIA,MSC Cruises,9210153,1,Ocean Cruise,,,1
+MSC OPERA,MSC Cruises,9250464,1,Ocean Cruise,,,1
+SEABOURN PURSUIT,Seabourn Cruises,9862035,1,Luxury Cruise,2023-08-10,,2
+RITZ CARLTON EVRIMA,Ritz-Carlton Yacht Collection,9823687,1,Luxury Cruise,2022-10-15,,2
+CARNIVAL ADVENTURE,Carnival Cruise Line,9192351,4,Ocean Cruise,,,1
+AIDAPRIMA,AIDA Cruises,9636955,1,Ocean Cruise,2016-03-14,,1
+MARELLA DISCOVERY 2,Marella Cruises,9070620,2,Ocean Cruise,,,2
+MARELLA DISCOVERY,Marella Cruises,9070632,3,Ocean Cruise,,,2
+MEIN SCHIFF 3,TUI Cruises,9641730,1,Ocean Cruise,,,1
+MEIN SCHIFF 4,TUI Cruises,9678408,1,Ocean Cruise,2015-06-06,,1
+SEVEN SEAS VOYAGER,Regent Seven Seas Cruises,9247144,1,Luxury Cruise,,,2
+CARNIVAL VICTORY,Carnival Cruise Line,9172648,2,Ocean Cruise,,,1
+MSC SPLENDIDA,MSC Cruises,9359806,1,Ocean Cruise,,,1
+MEIN SCHIFF 5,TUI Cruises,9753193,1,Ocean Cruise,2016-07-16,,1
+CARNIVAL TRIUMPH,Carnival Cruise Line,9138850,2,Ocean Cruise,,,1
+PACIFIC EXPLORER,P&O Australia,9103996,3,Ocean Cruise,,,3
+MARELLA EXPLORER,Marella Cruises,9106297,2,Ocean Cruise,,,2
+VIKING VESTA,Viking Ocean (Viking Cruises),9852444,1,Ocean Cruise,2025-07-02,,2
+MAJESTIC PRINCESS,Princess Cruises,9614141,2,Ocean Cruise,2017-04-04,,1
+AMBIENCE,Ambassador Cruise Line,8521232,2,Ocean Cruise,,,3
+MS ROALD AMUNDSEN,HX Expeditions,9813072,1,Expedition Cruise,2019-07-03,,2
+MS VEENDAM,Holland America,9102992,2,Ocean Cruise,,2020-07-01,1
+OCEANIA MARINA,Oceania Cruises,9438066,1,Ocean Cruise,,,2
+EMERALD AZZURRA,Emerald Yacht Cruises (Emerald Cruises),9903504,1,Luxury Cruise,2022-11-28,,4
+VIKING POLARIS,Viking Expeditions (Viking Cruises),9863209,1,Expedition Cruise,2022-10-03,,2
+COSTA FAVOLOSA,Costa Cruises,9479852,1,Ocean Cruise,,,1
+AZAMARA PURSUIT,Azamara Cruises,9210220,4,Ocean Cruise,,,2
+AZAMARA ONWARD,Azamara Cruises,9187887,3,Ocean Cruise,,,2
+SEABOURN VENTURE,Seabourn Cruises,9862023,1,Luxury Cruise,2022-07-27,,2
+MARELLA DREAM,Marella Cruises,8407735,2,Ocean Cruise,,2020-10-01,2
+COLUMBUS,Cruise & Maritime Voyages,8611398,2,Ocean Cruise,,2020-04-15,3
+SILVER SPIRIT,Silversea Cruises,9437866,1,Luxury Cruise,,,2
+NORWEGIAN JOY,Norwegian Cruise Line,9703796,1,Ocean Cruise,2017-06-27,,1
+MSC BELLISSIMA,MSC Cruises,9760524,1,Ocean Cruise,2019-03-04,,1
+WIND SPIRIT,Windstar Cruises,8603509,1,Cruise yacht,,,3
+OCEANIA RIVIERA,Oceania Cruises,9438078,1,Ocean Cruise,,,2
+MARELLA CELEBRATION,Marella Cruises,8027298,2,Ocean Cruise,,2020-04-29,2
+SEVEN SEAS MARINER,Regent Seven Seas Cruises,9210139,1,Luxury Cruise,,,2
+CARNIVAL LUMINOSA,Carnival Cruise Line,9398905,2,Ocean Cruise,,,1
+MSC ARMONIA,MSC Cruises,9210141,1,Ocean Cruise,,,1
+SAPPHIRE PRINCESS,Princess Cruises,9228186,2,Ocean Cruise,,,1
+COSTA FASCINOSA,Costa Cruises,9479864,1,Ocean Cruise,,,1
+VIKING OCTANTIS,Viking Expeditions (Viking Cruises),9863194,1,Expedition Cruise,2021-12-21,,2
+AIDASTELLA,AIDA Cruises,9601132,1,Ocean Cruise,,,1
+SILVER WHISPER,Silversea Cruises,9192179,1,Luxury Cruise,,,2
+AIDALUNA,AIDA Cruises,9334868,1,Ocean Cruise,,,1
+COSTA PACIFICA,Costa Cruises,9378498,1,Ocean Cruise,,,1
+PACIFIC WORLD,Peace Boat,9000259,2,Ocean Cruise,,,4
+CARNIVAL VENEZIA,Carnival Cruise Line,9801689,2,Ocean Cruise,2019-03-08,,1
+AIDASOL,AIDA Cruises,9490040,1,Ocean Cruise,,,1
+MAJESTY OF THE SEAS,Royal Caribbean,8819512,2,Ocean Cruise,,2020-12-01,1
+SCENIC ECLIPSE 2,Scenic Yacht Cruises (Scenic Cruises),9850460,2,Luxury Cruise,2023-04-12,,2
+MAGELLAN,Cruise & Maritime Voyages,8217881,2,Ocean Cruise,,2020-03-31,3
+MS FRIDTJOF NANSEN,HX Expeditions,9813084,1,Expedition Cruise,2020-06-26,,2
+COLUMBUS 2,Hapag-Lloyd Cruises,9156462,2,Luxury Cruise,,,2
+BOUDICCA,Fred Olsen Cruise Lines,7218395,1,Ocean Cruise,,2020-08-21,2
+AIDAMAR,AIDA Cruises,9490052,1,Ocean Cruise,,,1
+AIDABELLA,AIDA Cruises,9362542,1,Ocean Cruise,,,1
+AIDABLU,AIDA Cruises,9398888,1,Ocean Cruise,,,1
+CRYSTAL ENDEAVOR,Crystal Cruises,9821873,2,Luxury Cruise,2021-07-17,,2
+SEVEN SEAS NAVIGATOR,Regent Seven Seas Cruises,9064126,1,Luxury Cruise,,,2
+SEABOURN QUEST,Seabourn Cruises,9483126,1,Luxury Cruise,,,2
+COSTA DELIZIOSA,Costa Cruises,9398917,1,Ocean Cruise,,,1
+OCEANIA SIRENA,Oceania Cruises,9187899,2,Ocean Cruise,,,2
+SEABOURN SOJOURN,Seabourn Cruises,9417098,1,Luxury Cruise,,,2
+RENAISSANCE,Ambassador Cruise Line,8919257,3,Ocean Cruise,,,3
+CARNIVAL FASCINATION,Carnival Cruise Line,9041253,1,Ocean Cruise,,2020-07-01,1
+BLACK WATCH,Fred Olsen Cruise Lines,7108930,1,Ocean Cruise,,2020-08-21,2
+CELEBRITY MERCURY,Celebrity Cruises,9106302,4,Ocean Cruise,,,1
+SEABOURN LEGEND,Seabourn Cruises,9008598,2,Luxury Cruise,,,2
+VASCO DA GAMA,Cruise & Maritime Voyages,8919245,4,Ocean Cruise,,,3
+CELESTYAL JOURNEY,Celestyal Cruises,8919269,3,Ocean Cruise,,,4
+SILVER SHADOW,Silversea Cruises,9192167,1,Luxury Cruise,,,2
+OCEANIA NAUTICA,Oceania Cruises,9200938,1,Ocean Cruise,,,2
+AIDADIVA,AIDA Cruises,9334856,1,Ocean Cruise,,,1
+MARCO POLO,Cruise & Maritime Voyages,6417097,1,Ocean Cruise,,2020-07-20,3
+SILVER WIND,Silversea Cruises,8903935,1,Luxury Cruise,,,2
+MS PRINSENDAM,Holland America,8700280,2,Ocean Cruise,,,1
+CRYSTAL SERENITY,Crystal Cruises,9243667,1,Luxury Cruise,,,2
+CELEBRITY CENTURY,Celebrity Cruises,9072446,2,Ocean Cruise,,,1
+WIND STAR,Windstar Cruises,8420878,1,Cruise yacht,,,3
+CRYSTAL SYMPHONY,Crystal Cruises,9066667,1,Luxury Cruise,,,2
+SCENIC ECLIPSE,Scenic Yacht Cruises (Scenic Cruises),9797371,2,Luxury Cruise,2019-08-23,,2
+REGATTA,Explorations by Norwegian,9156474,2,Ocean Cruise,,,4
+WORLD TRAVELLER,Atlas Ocean Voyages,9904807,1,Expedition Cruise,2022-11-21,,4
+MSC LIRICA,MSC Cruises,9246102,1,Ocean Cruise,,,1
+ADORA MAGIC CITY,Adora Cruises Carnival China,9871036,1,Ocean Cruise,2024-01-01,,3
+MS NORDKAPP,Hurtigruten,9107772,1,Expedition Cruise,,,2
+COSTA FORTUNA,Costa Cruises,9239783,1,Ocean Cruise,,,1
+MARELLA SPIRIT,Marella Cruises,8024014,2,Ocean Cruise,,2018-11-04,2
+SEABOURN SPIRIT,Seabourn Cruises,8807997,2,Luxury Cruise,,,2
+PIANO LAND,Astro Ocean Cruise China,9050137,3,Ocean Cruise,,,4
+MS TROLLFJORD,Hurtigruten,9233258,1,Expedition Cruise,,,2
+CARNIVAL INSPIRATION,Carnival Cruise Line,9087489,1,Ocean Cruise,,2020-07-01,1
+MS DEUTSCHLAND,Phoenix Reisen,9141807,2,Ocean Cruise,,,3
+MITSUI OCEAN FUJI,Mitsui OSK Lines,9417086,2,Ocean Cruise,,,4
+BRAEMAR,Fred Olsen Cruise Lines,9000699,2,Ocean Cruise,,,2
+WORLD NAVIGATOR,Atlas Ocean Voyages,9871531,1,Expedition Cruise,2021-08-01,,4
+SILVER CLOUD,Silversea Cruises,8903923,1,Luxury Cruise,,,2
+MS NORDNORGE,Hurtigruten,9107784,1,Expedition Cruise,,,2
+CARNIVAL SENSATION,Carnival Cruise Line,8711356,1,Ocean Cruise,,2022-03-19,1
+MS RICHARD WITH,Hurtigruten,9040429,1,Expedition Cruise,,,2
+ROYAL CLIPPER,Star Clippers,8712178,1,Sailing Ship,,,3
+HAVILA POLARIS,Havila Voyages,9946910,1,Ferry Cruise,2023-08-19,,3
+MS MIDNATSOL,Hurtigruten,9247728,4,Expedition Cruise,,,2
+AIDAMIRA,AIDA Cruises,9172777,3,Ocean Cruise,,,1
+MS KONG HARALD,Hurtigruten,9039119,1,Expedition Cruise,,,2
+SEABOURN PRIDE,Seabourn Cruises,8707343,2,Luxury Cruise,,,2
+WIND SURF,Windstar Cruises,8700785,1,Cruise yacht,,,3
+PAUL GAUGUIN,Paul Gauguin Cruises (Ponant Cruises),9111319,2,Luxury Cruise,,,4
+COSTA MAGICA,Costa Cruises,9239795,2,Ocean Cruise,,2020-04-30,1
+MS EUROPA 2,Hapag-Lloyd Cruises,9616230,1,Luxury Cruise,,,2
+MS FRAM,HX Expeditions,9370018,1,Expedition Cruise,,,2
+AIDAVITA,AIDA Cruises,9221554,2,Ocean Cruise,,2020-03-01,1
+EMERALD SAKARA,Emerald Yacht Cruises (Emerald Cruises),9948827,1,Luxury Cruise,2023-06-24,,4
+HANSEATIC NATURE,Hapag-Lloyd Cruises,9817133,2,Luxury Cruise,2019-04-30,,2
+LE BOREAL,Ponant Cruises,9502506,1,Expedition Cruise,,,2
+HANSEATIC INSPIRATION,Hapag-Lloyd Cruises,9817145,1,Luxury Cruise,2019-10-14,,2
+ZHAO SHANG YI DUN-VIKING SUN,Viking China Coastal Cruise (Viking Cruises),9725433,2,Ocean Cruise,2017-10-04,,4
+AIDAAURA,AIDA Cruises,9221566,3,Ocean Cruise,,,1
+EXPLORIS ONE,Exploris Cruises,8806747,2,Expedition Cruise,,,4
+MSC SEASCAPE,MSC Cruises,9843807,1,Ocean Cruise,2022-11-18,,1
+KARNIKA,Jalesh Cruises,8521220,2,Ocean Cruise,,,4
+CORDELIA EMPRESS,Cordelia Cruises,8716899,3,Ocean Cruise,,,4
+HANSEATIC SPIRIT,Hapag-Lloyd Cruises,9857640,1,Luxury Cruise,2021-09-14,,2
+CELESTYAL CRYSTAL,Celestyal Cruises,7827213,2,Ocean Cruise,,,4
+ISLAND SKY,Noble Caledonia,8802894,1,Expedition Cruise,,,3
+SEADREAM II,SeaDream Yacht Club,8203440,1,Cruise yacht,,,4
+ADORA MEDITERRANEA,Adora Cruises Carnival China,9237345,2,Ocean Cruise,,,3
+NATIONAL GEOGRAPHIC ENDURANCE,Lindblad Expeditions,9842554,1,Expedition Cruise,2021-07-21,,2
+SH VEGA,Swan Hellenic Cruises,9895252,2,Expedition Cruise,2022-05-29,,3
+GRAND CLASSICA,Bahamas Paradise Cruise Line,8716502,3,Ocean Cruise,,,4
+CROWN IRIS,Mano Cruises,8814744,2,Ocean Cruise,,,4
+QUARK ULTRAMARINE,Quark Expeditions,9861017,1,Expedition Cruise,2020-12-18,,4
+COSTA VICTORIA,Costa Cruises,9109031,1,Ocean Cruise,,2020-05-25,1
+HAVILA CAPELLA,Havila Voyages,9865570,1,Ferry Cruise,2021-12-12,,3
+SILVER ORIGIN,Silversea Cruises,9837937,1,Luxury Cruise,2020-07-18,,2
+SEADREAM I,SeaDream Yacht Club,8203438,1,Cruise yacht,,,4
+MS LA BELLE DES OCEANS,CroisiEurope,8800195,2,Small Cruise,,,4
+GREG MORTIMER,Aurora Expeditions Australia,9834648,2,Expedition Cruise,2019-10-31,,3
+MS ARTANIA,Phoenix Reisen,8201480,2,Ocean Cruise,,,3
+MS OTTO SVERDRUP,Hurtigruten,9231951,3,Expedition Cruise,,,2
+CELEBRITY XPEDITION,Celebrity Cruises,9228368,2,Ocean Cruise,,,1
+AIDACARA,AIDA Cruises,9112789,2,Ocean Cruise,,,1
+GENTING DREAM,Dream Cruises,9733105,2,Ocean Cruise,,,3
+MS SPITSBERGEN,HX Expeditions,9434060,1,Expedition Cruise,,,2
+LE LYRIAL,Ponant Cruises,9704130,1,Expedition Cruise,,,2
+MS AMADEA,Phoenix Reisen,8913162,1,Ocean Cruise,,,3
+LE SOLEAL,Ponant Cruises,9641675,1,Expedition Cruise,,,2
+EXPLORER DREAM,Dream Cruises,9141077,4,Ocean Cruise,,,3
+WORLD VOYAGER,Atlas Ocean Voyages,9871529,1,Expedition Cruise,,,4
+MS EUROPA,Hapag-Lloyd Cruises,9183855,2,Luxury Cruise,,,2
+COSTA SERENA,Costa Cruises,9343132,1,Ocean Cruise,,,1
+L'AUSTRAL,Ponant Cruises,9502518,1,Expedition Cruise,,,2
+LE COMMANDANT CHARCOT,Ponant Cruises,9846249,1,Expedition Cruise,,,2
+MS POLARLYS,Hurtigruten,9107796,1,Expedition Cruise,,,2
+OCEAN ENDEAVOUR,Adventure Canada,7625811,2,Expedition Cruise,,,4
+HAVILA CASTOR,Havila Voyages,9865582,1,Ferry Cruise,,,3
+BLUE SAPPHIRE,ANEX Selectum Blu Cruises,7822457,2,Ocean Cruise,,,4
+MV SEA SPIRIT,Poseidon Expeditions,8802868,2,Expedition Cruise,,,4
+VIKING GLORY,Viking Line,9827877,1,Ferry Cruise,2022-03-01,,3
+NATIONAL GEOGRAPHIC EXPLORER,Lindblad Expeditions,8019356,1,Expedition Cruise,,,2
+HAVILA POLLUX,Havila Voyages,9946922,1,Ferry Cruise,,,3
+ASTOR,Cruise & Maritime Voyages,8506373,1,Ocean Cruise,,2020-10-15,3
+MS NORDLYS,Hurtigruten,9048914,1,Expedition Cruise,,,2
+SANTA CRUZ II,HX Expeditions,9265677,1,Expedition Cruise,,,2
+LE LAPEROUSE,Ponant Cruises,9814026,1,Expedition Cruise,2018-06-19,,2
+NATIONAL GEOGRAPHIC RESOLUTION,Lindblad Expeditions,9880685,1,Expedition Cruise,2021-11-07,,2
+SH DIANA,Swan Hellenic Cruises,9921740,2,Expedition Cruise,,,3
+MS SEAVENTURE,66 Degrees Expeditions China,8907424,5,Expedition Cruise,,,4
+HORIZON,Croisieres de France,8807088,2,Ocean Cruise,,,4
+LE CHAMPLAIN,Ponant Cruises,9814038,1,Expedition Cruise,2018-10-25,,2
+MS HAMBURG,Plantours,9138329,1,Ocean Cruise,,,4
+OCEAN VICTORY,Albatros Expeditions,9868869,2,Expedition Cruise,2021-11-26,,4
+COSTA NEOROMANTICA,Costa Cruises,8821046,1,Ocean Cruise,,2020-01-31,1
+SYLVIA EARLE,Aurora Expeditions Australia,9872327,1,Expedition Cruise,2022-11-04,,3
+STAR CLIPPER,Star Clippers,8915445,1,Sailing Ship,,,3
+HEBRIDEAN PRINCESS,Hebridean Island Cruises,6409351,1,Luxury Cruise,,,3
+STAR FLYER,Star Clippers,8915433,1,Sailing Ship,,,3
+OCEAN EXPLORER,Aurora Expeditions Australia,9883194,3,Expedition Cruise,2021-11-04,,3
+MV HONDIUS,Oceanwide Expeditions,9818709,1,Expedition Cruise,2019-06-03,,4
+LE JACQUES CARTIER,Ponant Cruises,9852420,1,Expedition Cruise,2020-07-01,,2
+PICTON CASTLE,Windward Isles Sailing Ship,5375010,1,Sailing Ship,,,4
+MS EXPEDITION,G Adventures Galapagos,7211074,1,Galapagos Cruise,,,4
+MV ORTELIUS,Oceanwide Expeditions,8509181,2,Expedition Cruise,,,4
+ZENITH,Pullmantur Cruises,8918136,1,Ocean Cruise,,2022-05-01,3
+COLOR MAGIC,Color Line,9349863,1,Ferry Cruise,,,3
+OCEAN ALBATROS,Albatros Expeditions,9880661,2,Expedition Cruise,,,4
+LE BOUGAINVILLE,Ponant Cruises,9814040,1,Expedition Cruise,2019-04-15,,2
+ARANUI 5,Aranui Cruises,9677492,1,Expedition Cruise,,,4
+LE BELLOT,Ponant Cruises,9852418,1,Expedition Cruise,2021-09-20,,2
+MONARCH,Pullmantur Cruises,8819500,1,Ocean Cruise,,2020-04-30,3
+AZORES,Cruise & Maritime Voyages,5383304,2,Ocean Cruise,,2020-12-01,3
+SOVEREIGN,Pullmantur Cruises,8512281,1,Ocean Cruise,,2020-07-23,3
+VIA AUSTRALIS,Australis Cruises Patagonia,9334088,2,Expedition Cruise,,,4
+OCEAN ADVENTURER,Quark Expeditions,7391422,4,Expedition Cruise,,,4
+CELESTYAL OLYMPIA,Celestyal Cruises,7927984,2,Ocean Cruise,,2023-11-30,4
+VIKING CINDERELLA,Viking Line,8719188,2,Ferry Cruise,,,3
+LE DUMONT DURVILLE,Ponant Cruises,9814052,1,Expedition Cruise,2019-08-07,,2
+SILJA SERENADE,Tallink Silja Line,8715259,1,Ferry Cruise,,,3
+SILJA SYMPHONY,Tallink Silja Line,8803769,1,Ferry Cruise,,,3
+COLOR FANTASY,Color Line,9278234,1,Ferry Cruise,,,3
+MS HANSEATIC,Hapag-Lloyd Cruises,9000168,3,Luxury Cruise,,,2
+MS VESTERALEN,Hurtigruten,8019368,1,Expedition Cruise,,,2
+NATIONAL GEOGRAPHIC ORION,Lindblad Expeditions,9273076,1,Expedition Cruise,,,2
+CORAL GEOGRAPHER,Coral Expeditions Australia,9883986,1,Expedition Cruise,2021-03-23,,3
+MS THE WORLD,residential ships,9219331,1,Luxury Cruise,,,4
+GABRIELLA,Viking Line,8917601,1,Ferry Cruise,,,3
+OCEAN VOYAGER,American Queen Voyages,9213129,2,Small Cruise,,,3
+CRUISE SAUDI MANARA,Aroya Cruises,9733117,3,Ocean Cruise,2017-11-19,,3
+HEBRIDEAN SKY,Noble Caledonia,8802882,1,Expedition Cruise,,,3
+MS NORRONA,Smyril Line,9227390,1,Ferry Cruise,,,4
+NIPPON MARU,Mitsui OSK Lines,8817631,1,Ocean Cruise,,,4
+OCEAN DIAMOND,Quark Expeditions,7325629,2,Expedition Cruise,,,4
+CORAL ADVENTURER,Coral Expeditions Australia,9838644,1,Expedition Cruise,2019-04-29,,3
+SAGA PEARL II,Saga Ocean Cruises (Saga Cruises),8000214,1,Ocean Cruise,,2019-04-12,2
+BALTIC QUEEN,Tallink Silja Line,9443255,1,Ferry Cruise,,,3
+WILDERNESS DISCOVERER,UnCruise Adventures,8859689,1,Expedition Cruise,,,4
+PRIDE OF ROTTERDAM,P&O Ferries,9208617,1,Ferry Cruise,,,3
+ISLAND ESCAPE,Island Cruises,8002597,2,Ocean Cruise,,2015-12-03,4
+ASUKA 2,NYK Cruises Japan,8806204,1,Ocean Cruise,,,3
+VIDANTA ELEGANT,Vidanta Cruises,8709573,2,Ocean Cruise,,,4
+PEARL MIST,Pearl Seas Cruises,9412701,1,Ocean Cruise,,,4
+MV AEGEAN ODYSSEY,Road Scholar Cruises,7225910,1,Ocean Cruise,,,4
+MV PLANCIUS,Oceanwide Expeditions,7432044,1,Expedition Cruise,,,4
+VICTORY II,American Queen Voyages,9213131,2,Small Cruise,,,3
+CRYSTAL ESPRIT,Crystal Cruises,8705266,2,Luxury Cruise,,,2
+SEA CLOUD SPIRIT,Sea Cloud Cruises,9483712,1,Sailing Ship,,,3
+WILDERNESS LEGACY,UnCruise Adventures,8963703,1,Expedition Cruise,,,4
+WORLD EXPLORER,Quark Expeditions,9835719,1,Expedition Cruise,2019-08-01,,4
+SAFARI EXPLORER,UnCruise Adventures,8964654,1,Expedition Cruise,,,4
+SAFARI ENDEAVOUR,UnCruise Adventures,8963698,1,Expedition Cruise,,,4
+PRIDE OF HULL,P&O Ferries,9208629,1,Ferry Cruise,,,3
+NATIONAL GEOGRAPHIC QUEST,Lindblad Expeditions,9798985,1,Expedition Cruise,2017-07-29,,2
+BLUE DREAM STAR,Blue Dream Cruises China,9183518,5,Ocean Cruise,,,4
+CROWN OF SCANDINAVIA,DFDS Seaways,8917613,3,Ferry Cruise,,,3
+MS LOFOTEN,Hurtigruten,5424562,1,Expedition Cruise,,2021-01-01,2
+NATIONAL GEOGRAPHIC VENTURE,Lindblad Expeditions,9799044,1,Expedition Cruise,2018-06-01,,2
+SILVER GALAPAGOS,Silversea Cruises,8708660,2,Luxury Cruise,,,2
+SUPERSTAR GEMINI,Star Cruises,9008419,1,Ocean Cruise,,2022-05-29,3
+BIRKA STOCKHOLM,Birka Cruises,9273727,2,Ocean Cruise,,,4
+MV USHUAIA,Antarpply Expeditions Antarctica,6901907,1,Expedition Cruise,,,4
+CLUB MED 2,Club Med Cruises,9007491,1,Luxury Cruise,,,4
+CALEDONIAN SKY,Captain Cook Cruises Fiji,8802870,1,Cruise yacht,,,4
+CELEBRITY XPLORATION,Celebrity Cruises,9455882,2,Ocean Cruise,,,1
+GRAND CELEBRATION,Bahamas Paradise Cruise Line,8314134,1,Ocean Cruise,,,4
+MINERVA,Hansa Touristik,9144196,3,Ocean Cruise,,,4
+SAFARI VOYAGER,UnCruise Adventures,8963753,1,Expedition Cruise,,,4
+MV CORINTHIAN,Grand Circle Cruise Line,8708672,1,Small Cruise,,,4
+PEARL SEAWAYS,DFDS Seaways,8701674,2,Ferry Cruise,,,3
+KING SEAWAYS,DFDS Seaways,8502406,1,Ferry Cruise,,,3
+MV CLIO,Grand Circle Cruise Line,9159830,2,Small Cruise,,,4
+BALTIC PRINCESS,Tallink Silja Line,9354284,1,Ferry Cruise,,,3
+SUPERSPEED 1,Color Line,9374519,1,Ferry Cruise,,,3
+MV REEF ENDEAVOUR,Captain Cook Cruises Fiji,9012666,1,Cruise yacht,,2023-11-01,4
+MS LA BELLE DE L'ADRIATIQUE,CroisiEurope,9432799,1,Small Cruise,,,4
+RRS DISCOVERY,UK (Icebreakers),9588029,1,Expedition Cruise,,,4
+MV MAGELLAN EXPLORER,Antarctica21 Air-Cruises,9822516,1,Expedition Cruise,2019-11-28,,4
+PONT AVEN,Brittany Ferries,9268708,1,Ferry Cruise,,,3
+VIKING GRACE,Viking Line,9606900,1,Ferry Cruise,,,3
+VICTORIA I,Tallink Silja Line,9281281,1,Ferry Cruise,,,3
+WILDERNESS EXPLORER,UnCruise Adventures,7641413,1,Expedition Cruise,,,4
+SEA CLOUD,Sea Cloud Cruises,8843446,1,Sailing Ship,,,3
+MV VIKINGFJORD,Secret Atlas,7382627,1,Expedition Cruise,,,4
+CORAL DISCOVERER,Coral Expeditions Australia,9292747,1,Expedition Cruise,,,3
+MV VENTUS AUSTRALIS,Australis Cruises Patagonia,9805403,1,Expedition Cruise,2018-09-27,,4
+RITZ CARLTON LUMINARA,Ritz-Carlton Yacht Collection,9967598,1,Luxury Cruise,2025-07-03,,2
+PRINCESS SEAWAYS,DFDS Seaways,8502391,1,Ferry Cruise,,,3
+STENA SCANDINAVICA,Stena Line,9235517,1,Ferry Cruise,,,3
+SEA CLOUD 2,Sea Cloud Cruises,9171292,1,Sailing Ship,,,3
+OCEAN NOVA,Antarctica21 Air-Cruises,8913916,1,Expedition Cruise,,,4
+LORD OF THE GLENS,Hebridean Island Cruises,8966470,1,Luxury Cruise,,,3
+SKORPIOS II,Cruceros Skorpios,8006397,1,Expedition Cruise,,,4
+MS SERENISSIMA,Noble Caledonia,5142657,2,Expedition Cruise,,,3
+STENA GERMANICA,Stena Line,9145176,1,Ferry Cruise,,,3
+NATIONAL GEOGRAPHIC SEA LION,Lindblad Expeditions,8966456,1,Expedition Cruise,,,2
+MV EVOLUTION,Quasar Expeditions,7122326,1,Galapagos Cruise,,,4
+MV ARTEMIS,Grand Circle Cruise Line,9398010,1,Small Cruise,,,4
+PROFESSOR KHROMOV,Heritage Expeditions,8010350,2,Expedition Cruise,,,4
+PRINCESS ANASTASIA,St. Peter Line,8414582,2,Ferry Cruise,,,4
+MY PEGASUS,Variety Cruises,8936841,1,Cruise yacht,,,4
+DISNEY ADVENTURE,Disney Cruise Line,9808986,1,Ocean Cruise,2026-03-10,,1
+MV STELLA AUSTRALIS,Australis Cruises Patagonia,9534676,1,Expedition Cruise,,,4
+GOLDEN HORIZON,Tradewind Voyages UK (Star Clippers),9793545,1,Sailing Ship,2021-06-09,,3
+NATIONAL GEOGRAPHIC SEA BIRD,Lindblad Expeditions,8966444,1,Expedition Cruise,,,2
+MV POLAR PIONEER,Aurora Expeditions Australia,8010324,3,Expedition Cruise,,,3
+MV ARETHUSA,Grand Circle Cruise Line,9398022,1,Small Cruise,,,4
+RRS JAMES COOK,UK (Icebreakers),9338242,1,Expedition Cruise,,,4
+MV GEMINI,Miray Life at Sea Cruises,9000687,1,Ocean Cruise,,,4
+STAVANGERFJORD,Fjord Line,9586605,1,Ferry Cruise,,,3
+MEGA VICTORIA,Corsica Ferries,8601915,3,Ferry Cruise,,,4
+CELEBRITY XPERIENCE,Celebrity Cruises,8112902,2,Ocean Cruise,,,1
+MS NORDSTJERNEN,Hurtigruten,5255777,1,Expedition Cruise,,2025-11-02,2
+MV ATHENA,Grand Circle Cruise Line,9398008,1,Small Cruise,,,4
+MS DOURO CRUISER,Nicko Cruises,9329344,1,Ocean Cruise,,,4
+MYSTAR,Tallink Silja Line,9892690,1,Ferry Cruise,,,3
+SAINT MALO,Brittany Ferries,9946336,1,Ferry Cruise,,,3
+MS GALILEO,Variety Cruises,8986286,1,Cruise yacht,,,4
+BARANOF DREAM,Alaskan Dream Cruises,8963715,1,Expedition Cruise,,,4
+MEGASTAR,Tallink Silja Line,9773064,1,Ferry Cruise,,,3
+GALICIA,Brittany Ferries,9856189,1,Ferry Cruise,2020-10-12,,3
+SAFARI QUEST,UnCruise Adventures,8669711,1,Expedition Cruise,,,4
+MY HARMONY G,Variety Cruises,8984989,1,Cruise yacht,,,4
+WILDERNESS ADVENTURER,UnCruise Adventures,8978667,1,Expedition Cruise,,,4
+SILJA EUROPA,Tallink Silja Line,8919805,1,Ferry Cruise,,,3
+LE PONANT,Ponant Cruises,8914219,1,Expedition Cruise,,,2
+STAR SEEKER,Windstar Cruises,9904819,2,Cruise yacht,2025-12-28,,3
+BERGENSFJORD,Fjord Line,9586617,1,Ferry Cruise,,,3
+GALAPAGOS LEGEND,Kleintours Galapagos,5404964,1,Galapagos Cruise,,,4
+OCEAN ODYSSEY,Vantage Travel Cruise Line,9880673,1,Small Cruise,2022-12-21,,4
+PANORAMA II,Variety Cruises,9325453,1,Cruise yacht,,,4
+SANTONA,Brittany Ferries,9886847,1,Ferry Cruise,,,3
+MV ISABELA II GALAPAGOS,Metropolitan Touring Galapagos,7914535,1,Galapagos Cruise,,,4
+OCEAN ATLANTIC,Albatros Expeditions,8325432,2,Expedition Cruise,,,4
+SY VELA,Island Windjammer,8674364,1,Sailing Ship,,,4
+ADMIRALTY DREAM,Alaskan Dream Cruises,8963727,1,Expedition Cruise,,,4
+MV FREYA,Secret Atlas,7912020,1,Expedition Cruise,,,4
+SUPERSPEED 2,Color Line,9378682,1,Ferry Cruise,,,3
+BELLA DESGAGNES,Desgagnes,9511519,1,Ferry Cruise,,,4
+MV POLARFRONT,Secret Atlas,7608708,1,Expedition Cruise,,,4
+RUNNING ON WAVES,88 Parsec,9589205,1,Sailing Ship,,,4
+NATIONAL GEOGRAPHIC ISLANDER,Lindblad Expeditions,9139878,1,Expedition Cruise,,,2
+MV COLUMBIA,Alaska Marine Highway System,7320095,1,Ferry Cruise,,,4
+LA PINTA GALAPAGOS,Metropolitan Touring Galapagos,8112897,1,Galapagos Cruise,,,4
+ROMANTIKA,Holland Norway Lines,9237589,3,Ferry Cruise,,,4
+MS FINNLADY,Finnlines,9336268,1,Ferry Cruise,,,4
+MS SPIRIT OF TASMANIA I,Spirit of Tasmania,9158446,1,Ferry Cruise,,,4
+REINA SILVIA VOYAGER,G Adventures Galapagos,9962926,1,Galapagos Cruise,,,4
+DOUGLAS MAWSON,Aurora Expeditions Australia,9992713,1,Expedition Cruise,,,3
+ECOVENTURA MV THEORY GALAPAGOS,Ecoventura Galapagos,9855616,1,Galapagos Cruise,,,4
+AQUA BLU,Aqua Expeditions,4902921,1,Cruise yacht,,,4
+ASUKA III,NYK Cruises Japan,9936355,1,Ocean Cruise,2025-07-01,,3
+BERLIN,FTI Cruises,7904889,3,Ocean Cruise,,,4
+SV REMBRANDT VAN RIJN,Oceanwide Expeditions,8941808,1,Sailing Ship,,,4
+ANEMOS,Aegean Sea Lines,7901265,2,Ferry Cruise,,,4
+AKADEMIK SERGEY VAVILOV,Shirshov Institute,8507729,1,Expedition Cruise,,,4
+AKADEMIK IOFFE,Shirshov Institute,8507731,1,Expedition Cruise,,,4
+MV TRUE NORTH,True North Adventure Cruises,9308651,1,Expedition Cruise,,,4
+GRANDE MARINER,Blount Small Ship Adventures,8978643,1,Cruise yacht,,,4
+PACIFIC VENUS,Venus Cruise,9160011,1,Ocean Cruise,,,4
+GALAXY,Tallink Silja Line,9333694,3,Ferry Cruise,,,3
+STAR I,Tallink Silja Line,9364722,1,Ferry Cruise,,,3
+MV EXPLORER,Secret Atlas,9080950,2,Expedition Cruise,,,4
+SALAMANCA,Brittany Ferries,9867592,1,Ferry Cruise,,,3
+MV TRUE NORTH II,True North Adventure Cruises,9192105,1,Expedition Cruise,,,4
+EUROPA,Bark Europa,8951932,1,Sailing Ship,,,4
+MV CORAL EXPEDITIONS II,Coral Expeditions Australia,8409240,1,Expedition Cruise,,,3
+SH MINERVA,Swan Hellenic Cruises,9895240,1,Expedition Cruise,,,3
+OCEAN MAJESTY,Hansa Touristik,6602898,1,Ocean Cruise,,,4
+GRANDE SCANDINAVIA,Grimaldi Lines,9220615,1,Ferry Cruise,,,4
+GOLDEN IRIS,Mano Maritime,7358573,1,Ocean Cruise,,,4
+BLUE STAR DELOS,Blue Star Ferries,9565039,1,Ferry Cruise,,,4
+NATIONAL GEOGRAPHIC ENDEAVOUR,Lindblad Expeditions,6611863,1,Expedition Cruise,,,2
+VARIETY VOYAGER,Variety Cruises,9657090,1,Cruise yacht,,,4
+XAVIER III GALAPAGOS,G Adventures Galapagos,8979013,1,Galapagos Cruise,,,4
+MV CORAL EXPEDITIONS I,Coral Expeditions Australia,8804696,1,Expedition Cruise,,,3
+CHICHAGOF DREAM,Alaskan Dream Cruises,8883563,1,Expedition Cruise,,,4
+PRINCESS ELEGANZA,Noble Caledonia,9776676,1,Expedition Cruise,,,3
+LORD OF THE HIGHLAND,Hebridean Island Cruises,9641285,1,Luxury Cruise,,,3
+ECOVENTURA MV ORIGIN GALAPAGOS,Ecoventura Galapagos,9802190,1,Galapagos Cruise,,,4
+FIJI PRINCESS,Blue Lagoon Cruises,9199907,1,Cruise yacht,,,4
+PETREL,Galapatours,9794733,1,Galapagos Cruise,,,4
+STENA SAGA,Stena Line,7911545,2,Ferry Cruise,,,3
+TREASURE OF GALAPAGOS,Avalon Waterways,9578804,1,Small Cruise,,,4
+ECO GALAXY,GalAgents,9765512,1,Galapagos Cruise,,,4
+KYDON,Ferries del Caribe,8916607,1,Ferry Cruise,,,4
+ISABELLE,Tallink Silja Line,8700723,1,Ferry Cruise,,,3
+MONSERRAT GALAPAGOS,G Adventures Galapagos,9096349,1,Galapagos Cruise,,,4
+STENA EMBLA,Stena Line,9807322,1,Ferry Cruise,,,3
+MEGA SMERALDA,Corsica Ferries,8306486,1,Ferry Cruise,,,4
+SUPERSTAR AQUARIUS,Star Cruises,9008421,1,Ocean Cruise,,,3
+STENA EUROPE,Stena Line,7901760,1,Ferry Cruise,,,3
+MEGA REGINA,Corsica Ferries,8320573,2,Ferry Cruise,,,4
+STENA EDDA,Stena Line,9807308,1,Ferry Cruise,,,3
+PS WAVERLEY,Small Cruise Lines,5386954,1,Cruise yacht,,,4
+MV HJALTLAND,NorthLink Ferries,9244958,1,Ferry Cruise,,,3
+MAX,Molslinjen,9176058,1,Ferry Cruise,,,4
+NILS HOLGERSSON,TT-Line,9865685,1,Ferry Cruise,,,4
+COSTA ALLEGRA,Costa Cruises,6916885,1,Ocean Cruise,,2012-03-01,1
+COSTA CONCORDIA,Costa Cruises,9320544,1,Ocean Cruise,,2012-01-13,1
+MV CAPE RACE,Secret Atlas,5402198,1,Expedition Cruise,,,4
+MV NANOOK,Secret Atlas,6804408,1,Expedition Cruise,,,4
+MV VILLA,Secret Atlas,7382641,1,Expedition Cruise,,,4
+MV KINFISH,Secret Atlas,8423909,1,Expedition Cruise,,,4
+MV HANSE EXPLORER,Secret Atlas,9346110,1,Expedition Cruise,,,4
+MY CALLISTO,Variety Cruises,5416553,1,Cruise yacht,,,4
+MY HARMONY V,Variety Cruises,8620583,1,Cruise yacht,,,4
+PANORAMA I,Variety Cruises,8928260,1,Cruise yacht,,,4
+BLACK PRINCE,Fred Olsen Cruise Lines,6613328,1,Ocean Cruise,,,2
+KAPITAN KLEBNIKOV,Quark Expeditions,7824417,1,Expedition Cruise,,,4
+ESTRELLA DEL MAR GALAPAGOS,G Adventures Galapagos,8978928,1,Galapagos Cruise,,,4
+50 LET POBEDY,Quark Expeditions,9152959,1,Expedition Cruise,,,4
+BAIE DE SEINE,Brittany Ferries,9212163,3,Ferry Cruise,,,3
+QUEEN OF GALAPAGOS,G Adventures Galapagos,9447213,1,Galapagos Cruise,,,4
+KRUZOF EXPLORER,Alaskan Dream Cruises,7049378,1,Expedition Cruise,,,4
+SV NOORDERLICHT,Oceanwide Expeditions,8650813,1,Expedition Cruise,,,4
+SEA ENDURANCE,Noble Caledonia,8913904,1,Expedition Cruise,,,3
+ALASKAN DREAM,Alaskan Dream Cruises,8978679,1,Expedition Cruise,,,4
+MS ALBATROS,Phoenix Reisen,7304314,1,Ocean Cruise,,,3
+PROFESSOR MOLCHANOV,Small Cruise Lines,8010348,1,Cruise yacht,,,4
+PROFESSOR MULTANOVSKIY,Small Cruise Lines,8010362,1,Cruise yacht,,,4
+MEGA ANDREA,Corsica Ferries,8306498,1,Ferry Cruise,,,4
+SUPERSTAR LIBRA,Star Cruises,8612134,1,Ocean Cruise,,,3
+STAR PISCES,Star Cruises,8710857,1,Ocean Cruise,,,3
+AMERICANA,Small Cruise Lines,8949472,1,Cruise yacht,,,4
+MOBY DREA,Moby Lines,7361312,1,Ferry Cruise,,,4
+MOBY OTTA,Moby Lines,7361324,1,Ferry Cruise,,,4
+MV SANTA CRUZ,Metropolitan Touring Galapagos,7811721,1,Galapagos Cruise,,,4
+MOBY DADA,Moby Lines,7911533,2,Ferry Cruise,,,4
+MV HROSSEY,NorthLink Ferries,9244960,1,Ferry Cruise,,,3
+MV HAMNAVOE,NorthLink Ferries,9246061,1,Ferry Cruise,,,3
+ECOVENTURA MV EVOLVE GALAPAGOS,Ecoventura Galapagos,9972268,1,Galapagos Cruise,,,4
+AQUA MARE,Aqua Expeditions,1005942,1,Cruise yacht,,,4
+OCEAN DREAM,Peace Boat,7915096,1,Ocean Cruise,,,4
+AKADEMIK SHOKALSKIY,Heritage Expeditions,8010336,1,Expedition Cruise,,,4
+PACIFIC SUN,P&O Australia,8314122,1,Ocean Cruise,,,3
+GLEN MASSAN,The Majestic Line,8346369,1,Cruise yacht,,,4
+GLEN TARSAN,The Majestic Line,8346371,1,Cruise yacht,,,4
+GRANDE CARIBE,Blount Small Ship Adventures,8978631,1,Cruise yacht,,,4
+SKORPIOS III,Cruceros Skorpios,9143908,1,Expedition Cruise,,,4
+ARANUI 3,Aranui Cruises,9245354,1,Expedition Cruise,,,4
+GALAXY,Galaxy Cruises,1008231,1,Cruise yacht,,,4
+CATALYST,Pacific Catalyst,2113540,1,Expedition Cruise,,,4
+HMS DEFENDER,Royal Navy,4907878,1,Expedition Cruise,,,4
+FUNCHAL,Signature Living,5124162,1,Ocean Cruise,,,4
+PORTO,Portuscale Cruises,6419057,1,Ocean Cruise,,,4
+POLARIS,Murmansk Shipping,6807395,1,Expedition Cruise,,,4
+MV FREEWINDS,Majestic Cruise Lines,6810811,1,Ocean Cruise,,,4
+AEGEAN QUEEN,Etstur,6821080,2,Ocean Cruise,,,4
+LEISURE WORLD,New Century Cruise Lines,6921828,1,Ocean Cruise,,,4
+KNYAZ VLADIMIR,Black Sea Shipping Company,7032997,1,Ocean Cruise,,,4
+ADRIANA,Adriana Cruises,7118404,1,Ocean Cruise,,,4
+ORIENTAL DRAGON,Capital Dragon Global Holding,7125861,1,Ocean Cruise,,,4
+MV DELPHIN,Delphin Seereisen,7347536,1,Ocean Cruise,,2022-04-03,4
+SALAMIS FILOXENIA,Cypriot Salamis Cruises,7359400,1,Ocean Cruise,,,4
+RMS ST HELENA,St Helena Line,8716306,1,Ferry Cruise,,,4
+AEGEAN PARADISE,New Century Tours,8902333,1,Ocean Cruise,,,4
+TURAMA,Sete Yacht Management,8907216,1,Ocean Cruise,,,4
+ANDAMAN EXPLORER,Pandaw,8999829,1,Small Cruise,,,4
+CHINA STAR,China Cruises,9008407,2,Ocean Cruise,,,4
+DALMACIJA,Jadrolinija,9058995,1,Ferry Cruise,,,4
+YAMAL,FSUE Atomflot,9077549,1,Expedition Cruise,,,4
+CHINESE TAISHAN,Bohai Ferry Company,9183506,1,Ferry Cruise,,,4
+EXCELSIOR,Grandi Navi Veloci,9184419,1,Ferry Cruise,,,4
+PANSTAR MIRACLE,PanStar Cruise,9980148,1,Ferry Cruise,,,4
+REGINA BALTICA,Tallink Silja Line,7827225,1,Ferry Cruise,,,3
+NORWEGIAN LUNA,Norwegian Cruise Line,9824019,1,Ocean Cruise,2026-03-10,,1
+GLOBAL MERCY,Mercy Ships,9726499,1,Hospital Ship,,,4
+PASPALEY PEARL,Pearl Expeditions Cruises,9903994,1,Expedition Cruise,,,4
+MS INFINITY,Avalon Waterways,9863912,1,Galapagos Cruise,,,4
+MANDALAY,Windjammer Barefoot Cruises,7738383,1,Sailing Ship,,,4

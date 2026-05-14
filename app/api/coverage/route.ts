@@ -55,10 +55,10 @@ function devFallback(): CoveragePayload {
   }
 
   const ships = [
-    { id: 1, mmsi: 209407000, name: "QUEEN MARY 2", display_name: "Queen Mary 2", cruise_line: "Cunard", imo_number: "9241061", in_service: true },
-    { id: 2, mmsi: 311042900, name: "ICON OF THE SEAS", display_name: "Icon of the Seas", cruise_line: "Royal Caribbean", imo_number: "9929420", in_service: true },
-    { id: 3, mmsi: 235103245, name: "ANTHEM OF THE SEAS", display_name: "Anthem of the Seas", cruise_line: "Royal Caribbean", imo_number: "9656099", in_service: true },
-    { id: 4, mmsi: 232003251, name: "VENTURA", display_name: "Ventura", cruise_line: "P&O Cruises", imo_number: "9333175", in_service: false },
+    { id: 1, mmsi: 209407000, name: "QUEEN MARY 2",       display_name: "Queen Mary 2",       cruise_line: "Cunard",          imo_number: "9241061", in_service: true,  cruise_type: "Ocean Cruise", service_start: "2004-01-12", service_end: null,         tier: 1 as const },
+    { id: 2, mmsi: 311042900, name: "ICON OF THE SEAS",   display_name: "Icon of the Seas",   cruise_line: "Royal Caribbean", imo_number: "9929420", in_service: true,  cruise_type: "Ocean Cruise", service_start: "2024-01-27", service_end: null,         tier: 1 as const },
+    { id: 3, mmsi: 235103245, name: "ANTHEM OF THE SEAS", display_name: "Anthem of the Seas", cruise_line: "Royal Caribbean", imo_number: "9656099", in_service: true,  cruise_type: "Ocean Cruise", service_start: "2015-04-22", service_end: null,         tier: 1 as const },
+    { id: 4, mmsi: 232003251, name: "VENTURA",            display_name: "Ventura",            cruise_line: "P&O Cruises",     imo_number: "9333175", in_service: false, cruise_type: "Ocean Cruise", service_start: null,         service_end: "2024-09-01", tier: 1 as const },
   ];
 
   const voyage_cells: CoveragePayload["voyage_cells"] = {};

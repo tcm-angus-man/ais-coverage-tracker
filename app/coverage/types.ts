@@ -6,6 +6,12 @@ export type Ship = {
   cruise_line: string;
   imo_number: string;
   in_service: boolean;
+  // From Sheets ship_metadata. Cells outside [service_start, service_end] are
+  // rendered as out-of-service in the heatmap. Tier 4 is the default bucket.
+  cruise_type: string | null;
+  service_start: string | null;
+  service_end: string | null;
+  tier: 1 | 2 | 3 | 4;
 };
 
 export type Cell = {

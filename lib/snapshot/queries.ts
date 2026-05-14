@@ -25,6 +25,9 @@ import { VOYAGE_START, SILVER_START } from "./types";
 // mmsis appearing in ais_silver_summary that map to a non-river-cruise
 // ship row. We dedupe by mmsi preferring the row with notes IS NULL.
 export async function fetchShips(pool: Pool): Promise<ShipRow[]> {
+  // Metadata fields (cruise_type, service_start, service_end, tier) are
+  // joined onto each row by buildSnapshot() from Google Sheets, not Postgres.
+  // We default them here so the row type is internally consistent.
   const result = await pool.query<ShipRow>(`
     WITH voyage_universe AS (
       SELECT DISTINCT s.mmsi
@@ -74,7 +77,11 @@ export async function fetchShips(pool: Pool): Promise<ShipRow[]> {
       COALESCE(d.display_name, d.name, '')::text AS display_name,
       COALESCE(d.cruise_line, '')::text AS cruise_line,
       COALESCE(d.imo_number::text, '') AS imo_number,
-      COALESCE(d.in_service, FALSE) AS in_service
+      COALESCE(d.in_service, FALSE) AS in_service,
+      NULL::text AS cruise_type,
+      NULL::text AS service_start,
+      NULL::text AS service_end,
+      4::int     AS tier
     FROM deduped d
     ORDER BY display_name ASC NULLS LAST
   `);

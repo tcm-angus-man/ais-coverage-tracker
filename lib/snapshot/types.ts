@@ -10,6 +10,13 @@ export type ShipRow = {
   cruise_line: string;
   imo_number: string;
   in_service: boolean;
+  // Joined from Google Sheets ship_metadata tab. Tier defaults to 4 when no
+  // metadata row matches the imo_number. service_start/end are null when
+  // the ship has been active since before the voyage window / is still in service.
+  cruise_type: string | null;
+  service_start: string | null;
+  service_end: string | null;
+  tier: 1 | 2 | 3 | 4;
 };
 
 export type VoyageCellRow = {

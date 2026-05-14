@@ -152,6 +152,39 @@ function drawDiagonalCell(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.lineTo(x, y2); ctx.closePath(); ctx.fill();
 }
 
+// True if `date` falls outside the ship's [service_start, service_end] window.
+// Blank service_start = "active before voyage window"; blank service_end =
+// "still in service". String comparison is safe because dates are YYYY-MM-DD.
+function isOutOfService(ship: Ship, date: string): boolean {
+  if (ship.service_start && date < ship.service_start) return true;
+  if (ship.service_end   && date > ship.service_end)   return true;
+  return false;
+}
+
+// Out-of-service cells render as solid dark grey with a diagonal hatch on top.
+// Visually distinct from C_MISSING (the BG colour used for "no data") so the
+// viewer can tell "this ship wasn't active yet" from "no request on this day".
+const C_OUT_OF_SERVICE = "#1a232b";
+const C_OUT_OF_SERVICE_HATCH = "rgba(90,109,124,0.35)";
+function drawOutOfServiceCell(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  ctx.fillStyle = C_OUT_OF_SERVICE;
+  ctx.fillRect(x, y, w, h);
+  // Diagonal hatch — short strokes every 4px from top-right to bottom-left.
+  // Cheap to draw per-cell since w/h are small (5–11px) and we only run this
+  // for cells inside the visible viewport.
+  ctx.save();
+  ctx.strokeStyle = C_OUT_OF_SERVICE_HATCH;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const step = 4;
+  for (let off = -h; off < w; off += step) {
+    ctx.moveTo(x + off, y);
+    ctx.lineTo(x + off + h, y + h);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 // ---------- types ----------
 type SortKey = "name" | "coverage" | "activity" | "imo" | "cruise_line";
 
@@ -191,6 +224,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const [,            setRenderTick]  = useState(0);
   const [filter,      setFilter]      = useState("");
   const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
+  const [selectedTiers, setSelectedTiers] = useState<Set<1 | 2 | 3 | 4>>(new Set());
   const [inServiceOnly, setInServiceOnly] = useState(false);
   const [sort,        setSort]        = useState<SortKey>("name");
   const [tooltip,     setTooltip]     = useState<TooltipState>(null);
@@ -260,6 +294,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const s = ships[i];
       if (isSilver && !silverShipSet.has(s.mmsi)) return false;
       if (inServiceOnly && !s.in_service) return false;
+      if (selectedTiers.size > 0 && !selectedTiers.has(s.tier)) return false;
       if (selectedLines.size > 0 && !selectedLines.has(s.cruise_line)) return false;
       if (filteredAssigneeMmsis && !filteredAssigneeMmsis.has(s.mmsi)) return false;
       if (filter.trim()) {
@@ -297,14 +332,16 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       idxs.sort((a, b) => ships[a].display_name.localeCompare(ships[b].display_name));
     }
     return idxs;
-  }, [ships, filter, inServiceOnly, selectedLines, filteredAssigneeMmsis, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver]);
+  }, [ships, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeMmsis, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver]);
 
   // KPIs — filter-aware
   const kpis = useMemo(() => {
     if (isSilver) {
       let withData = 0, needsReview = 0, missing = 0;
       for (const si of baseShipIdx) {
+        const ship = ships[si];
         for (let di = silverDateOffset; di < dates.length; di++) {
+          if (isOutOfService(ship, dates[di])) continue;
           const cell = silver.cells[si][di];
           if (!cell || cell.t === 0) { missing++; continue; }
           withData++;
@@ -353,10 +390,14 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         return qualifying;
       }
 
-      let withData = 0, requested = 0, needsReview = 0, missing = 0, covidExcluded = 0;
+      let withData = 0, requested = 0, needsReview = 0, missing = 0, covidExcluded = 0, oosExcluded = 0;
       for (const si of baseShipIdx) {
+        const ship = ships[si];
         const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(si) : null;
         for (let d = 0; d < dates.length; d++) {
+          // Skip days outside the ship's [service_start, service_end] window —
+          // a ship retired in 2020 shouldn't drag down the 2015–today denominator.
+          if (isOutOfService(ship, dates[d])) { oosExcluded++; continue; }
           const cell = voyage.cells[si][d];
           const hasVoyage = cell && cell.t > 0;
           const hasVisible = cell && cell.v >= 1;
@@ -372,9 +413,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const total = withData + missing;
       const pct        = total     === 0 ? 0 : Math.round((withData / total)     * 1000) / 10;
       const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded };
+      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
     }
-  }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates]);
+  }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates, ships]);
 
   const rowCount = baseShipIdx.length;
   const colCount = activeDates.length;
@@ -444,11 +485,20 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     // Cells
     for (let r = firstRow; r <= lastRow; r++) {
       const shipIdx = baseShipIdx[r];
+      const ship = ships[shipIdx];
       const y = HEADER_H + r * CELL_H - sy;
       for (let c = firstCol; c <= lastCol; c++) {
         const di = activeDateOffset + c;
         const cx = HEADER_W + c * CELL_W - sx;
         const cw = CELL_W - 1, ch = CELL_H - 1;
+        const cellDate = dates[di];
+
+        // Out-of-service days short-circuit all mode-specific rendering.
+        // Distinct from C_MISSING (no data) and from gap days (np=1).
+        if (cellDate && isOutOfService(ship, cellDate)) {
+          drawOutOfServiceCell(ctx, cx, y, cw, ch);
+          continue;
+        }
 
         if (mode === "voyage") {
           const cell = voyage.cells[shipIdx][di];
@@ -680,6 +730,17 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           onToggle={toggleLine}
           onClear={() => setSelectedLines(new Set())}
         />
+
+        <Divider />
+
+        <CtrlLabel>Tier</CtrlLabel>
+        <TierPills selected={selectedTiers} onToggle={(t) => {
+          setSelectedTiers(prev => {
+            const next = new Set(prev);
+            if (next.has(t)) next.delete(t); else next.add(t);
+            return next;
+          });
+        }} />
 
         <Divider />
 
@@ -949,14 +1010,52 @@ function Divider() {
   return <div style={{ width: 1, height: 16, background: C_LINE, flexShrink: 0 }} />;
 }
 
+// Tier filter pills. T1 = mainstream contemporary; T2 = luxury + premium
+// expedition; T3 = smaller regional / mid-tier; T4 = niche / single-ship
+// operators (the default bucket for unmapped lines).
+const TIER_LABELS: Record<1 | 2 | 3 | 4, string> = {
+  1: "T1",
+  2: "T2",
+  3: "T3",
+  4: "T4",
+};
+function TierPills({ selected, onToggle }: { selected: Set<1 | 2 | 3 | 4>; onToggle: (t: 1 | 2 | 3 | 4) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      {([1, 2, 3, 4] as const).map(t => {
+        const on = selected.has(t);
+        return (
+          <button
+            key={t}
+            onClick={() => onToggle(t)}
+            title={`Tier ${t}`}
+            style={{
+              padding: "3px 9px", fontSize: 10, cursor: "pointer", fontFamily: "inherit",
+              background: on ? C_VISIBLE : "transparent",
+              color: on ? "#0b1014" : C_INK_FAINT,
+              border: `1px solid ${on ? C_VISIBLE : C_LINE}`,
+              borderRadius: 2,
+              fontWeight: on ? 600 : 400,
+              letterSpacing: "0.04em",
+            }}
+          >
+            {TIER_LABELS[t]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const selectStyle: React.CSSProperties = {
   padding: "3px 8px", background: C_BG, border: `1px solid ${C_LINE}`,
   borderRadius: 2, fontSize: 11, color: C_INK, fontFamily: "inherit", outline: "none", cursor: "pointer",
 };
 
 function Legend({ mode }: { mode: ShellMode }) {
+  const oosEntry = { color: C_OUT_OF_SERVICE, label: "Out of service", border: true };
   const entries = mode === "silver"
-    ? [{ color: C_SILVER_OK, label: "Clean" }, { color: C_SILVER_NR, label: "Needs review" }, { color: C_MISSING, label: "No data", border: true }]
+    ? [{ color: C_SILVER_OK, label: "Clean" }, { color: C_SILVER_NR, label: "Needs review" }, { color: C_MISSING, label: "No data", border: true }, oosEntry]
     : mode === "voyage"
       ? [
           { color: C_VISIBLE,   label: "Visible" },
@@ -964,8 +1063,9 @@ function Legend({ mode }: { mode: ShellMode }) {
           { color: C_NO_AIS,    label: "No AIS" },
           { color: C_NEED_PROC, label: "Need process" },
           { color: C_MISSING,   label: "No voyage", border: true },
+          oosEntry,
         ]
-      : [{ color: C_VISIBLE, label: "Voyage visible" }, { color: C_SILVER_OK, label: "Silver clean" }, { color: C_SILVER_NR, label: "Silver review" }, { color: C_MISSING, label: "No data", border: true }];
+      : [{ color: C_VISIBLE, label: "Voyage visible" }, { color: C_SILVER_OK, label: "Silver clean" }, { color: C_SILVER_NR, label: "Silver review" }, { color: C_MISSING, label: "No data", border: true }, oosEntry];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       {entries.map(e => {
@@ -1007,11 +1107,23 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
         <div style={{ fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
           IMO {ship.imo_number} · MMSI {ship.mmsi}
         </div>
+        {(ship.cruise_type || ship.service_start || ship.service_end) && (
+          <div style={{ fontSize: 9.5, color: C_INK_FAINT, marginTop: 2 }}>
+            {ship.cruise_type ? `${ship.cruise_type} · ` : ""}T{ship.tier}
+            {(ship.service_start || ship.service_end) ? ` · ${ship.service_start ?? "—"} → ${ship.service_end ?? "present"}` : ""}
+          </div>
+        )}
         <div style={{ fontSize: 10, color: C_INK_DIM, marginTop: 2 }}>{date}</div>
       </div>
-      {(mode === "voyage" || mode === "combined") && voyage && <VoyageTooltip cell={voyage} />}
-      {(mode === "silver" || mode === "combined") && silver && <SilverTooltip cell={silver} />}
-      {!voyage && !silver && <div style={{ color: C_INK_FAINT }}>no data</div>}
+      {isOutOfService(ship, date) ? (
+        <div style={{ color: C_INK_FAINT, fontStyle: "italic" }}>out of service on this date</div>
+      ) : (
+        <>
+          {(mode === "voyage" || mode === "combined") && voyage && <VoyageTooltip cell={voyage} />}
+          {(mode === "silver" || mode === "combined") && silver && <SilverTooltip cell={silver} />}
+          {!voyage && !silver && <div style={{ color: C_INK_FAINT }}>no data</div>}
+        </>
+      )}
       {/* Assignment footer — silver/cleanliness page only */}
       {(mode === "silver" || mode === "combined") && assignment && assigneeColor && (
         <div style={{ borderTop: `1px solid ${C_LINE}`, marginTop: 6, paddingTop: 5, display: "flex", alignItems: "center", gap: 6 }}>
