@@ -997,7 +997,10 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
       borderRadius: 4, padding: "10px 14px", fontSize: 11, color: C_INK,
       boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
       left: x + 14, top: y - 8,
-      transform: x > window.innerWidth - 260 ? "translateX(-110%)" : undefined,
+      transform: [
+        x > window.innerWidth - 260 ? "translateX(-110%)" : "",
+        y > window.innerHeight - 200 ? "translateY(-100%)" : "",
+      ].filter(Boolean).join(" ") || undefined,
     }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontWeight: 600 }}>{ship.display_name}</div>
