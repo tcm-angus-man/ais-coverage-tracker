@@ -64,6 +64,10 @@ export const fetchShipMetadata = unstable_cache(
   { revalidate: 300, tags: ["ship_metadata"] },
 );
 
+// Bypasses the cache. Use from debug endpoints where you want to see the
+// current sheet state without a 5-minute lag.
+export const fetchShipMetadataUncached = fetchShipMetadataRaw;
+
 export function indexByImo(rows: ShipMetadata[]): Map<string, ShipMetadata> {
   const m = new Map<string, ShipMetadata>();
   for (const r of rows) m.set(r.imo_number, r);

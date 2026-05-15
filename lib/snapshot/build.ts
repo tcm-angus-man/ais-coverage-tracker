@@ -9,7 +9,7 @@ import {
 import { VOYAGE_START } from "./types";
 import { compressJson } from "./compress";
 import { putCoverageBlob, type BlobPutResult } from "./blob";
-import { fetchShipMetadata, indexByImo, type ShipMetadata } from "@/lib/sheets/ship-metadata";
+import { fetchShipMetadataUncached, indexByImo, type ShipMetadata } from "@/lib/sheets/ship-metadata";
 
 export type BuildResult = {
   generated_at: string;
@@ -26,7 +26,7 @@ export type BuildResult = {
 // audit appends are best-effort; same principle here.
 async function fetchShipMetadataSafe(): Promise<ShipMetadata[]> {
   try {
-    return await fetchShipMetadata();
+    return await fetchShipMetadataUncached();
   } catch (err) {
     console.error("[snapshot] ship_metadata fetch failed, defaulting all ships to Tier 4:", err);
     return [];
