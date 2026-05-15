@@ -4,7 +4,11 @@ import { authOptions } from "@/lib/auth";
 import { sheetsGet } from "@/lib/sheets/client";
 import { SHIP_METADATA_COLUMNS } from "@/lib/sheets/schemas";
 import { fetchShipMetadataUncached } from "@/lib/sheets/ship-metadata";
+import { readCoverageBlob } from "@/lib/snapshot/blob";
+import { decompressJson } from "@/lib/snapshot/compress";
+import type { CoveragePayload } from "@/app/coverage/types";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -42,20 +46,74 @@ export async function GET() {
       parsedError = e instanceof Error ? e.message : String(e);
     }
 
+    // Read the live snapshot blob so we can see the IMOs as they currently
+    // appear in the served data — and how many of them join successfully.
+    let blobError: string | null = null;
+    let blobShipCount = 0;
+    let blobGeneratedAt: string | null = null;
+    let blobTierCounts: Record<string, number> = {};
+    let blobImoSample: { imo_number: string; tier: number; cruise_type: string | null }[] = [];
+    let joinMatched = 0;
+    let joinMismatched = 0;
+    let joinMismatchSample: { display_name: string; imo_number: string }[] = [];
+    try {
+      const buf = await readCoverageBlob();
+      if (!buf) throw new Error("blob not found — cron has not run yet");
+      const payload = await decompressJson<CoveragePayload>(buf);
+      blobGeneratedAt = payload.generated_at;
+      blobShipCount = payload.ships.length;
+
+      // Build the metadata index from the *uncached* fetch result we already have above.
+      const metaIndex = new Map<string, unknown>();
+      try {
+        const parsed = await fetchShipMetadataUncached();
+        for (const r of parsed) metaIndex.set(r.imo_number, r);
+      } catch { /* surfaced separately above */ }
+
+      for (const s of payload.ships) {
+        const tk = String(s.tier);
+        blobTierCounts[tk] = (blobTierCounts[tk] || 0) + 1;
+        const meta = metaIndex.get(s.imo_number);
+        if (meta) joinMatched++; else {
+          joinMismatched++;
+          if (joinMismatchSample.length < 8) {
+            joinMismatchSample.push({ display_name: s.display_name, imo_number: JSON.stringify(s.imo_number) });
+          }
+        }
+      }
+      blobImoSample = payload.ships.slice(0, 5).map(s => ({
+        imo_number: s.imo_number,
+        tier: s.tier,
+        cruise_type: s.cruise_type,
+      }));
+    } catch (e) {
+      blobError = e instanceof Error ? e.message : String(e);
+    }
+
     return NextResponse.json({
       ok: true,
       expected_header: SHIP_METADATA_COLUMNS,
-      raw: {
+      sheet_raw: {
         error: rawError,
         row_count_first_page: rawRows.length,
         header_row: rawRows[0] ?? null,
         first_data_rows: rawRows.slice(1, 4),
       },
-      parsed: {
+      sheet_parsed: {
         error: parsedError,
         count: parsedCount,
         tier_counts: tierCounts,
         sample: parsedSample,
+      },
+      snapshot_blob: {
+        error: blobError,
+        generated_at: blobGeneratedAt,
+        ship_count: blobShipCount,
+        tier_counts: blobTierCounts,
+        imo_sample: blobImoSample,
+        join_matched: joinMatched,
+        join_mismatched: joinMismatched,
+        join_mismatch_sample: joinMismatchSample,
       },
     });
   } catch (e) {
