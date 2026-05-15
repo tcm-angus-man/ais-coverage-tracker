@@ -9,7 +9,7 @@ import {
 import { VOYAGE_START } from "./types";
 import { compressJson } from "./compress";
 import { putCoverageBlob, type BlobPutResult } from "./blob";
-import { fetchShipMetadataUncached, indexByImo, type ShipMetadata } from "@/lib/sheets/ship-metadata";
+import { fetchShipMetadataUncached, indexByMmsi, type ShipMetadata } from "@/lib/sheets/ship-metadata";
 
 export type BuildResult = {
   generated_at: string;
@@ -43,7 +43,7 @@ export async function buildSnapshot(): Promise<BuildResult> {
     fetchShipMetadataSafe(),
   ]);
   const dates = buildDateAxis();
-  const metadataByImo = indexByImo(metadata);
+  const metadataByMmsi = indexByMmsi(metadata);
 
   const voyage_cells: Record<string, Record<string, Cell>> = {};
   for (const r of voyageRows) {
@@ -84,7 +84,7 @@ export async function buildSnapshot(): Promise<BuildResult> {
     generated_at,
     date_range: { start: VOYAGE_START, end: dates[dates.length - 1] },
     ships: ships.map((s) => {
-      const meta = metadataByImo.get(s.imo_number);
+      const meta = metadataByMmsi.get(s.mmsi);
       return {
         id: s.id,
         mmsi: s.mmsi,

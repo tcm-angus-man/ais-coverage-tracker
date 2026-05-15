@@ -52,10 +52,10 @@ export async function GET() {
     let blobShipCount = 0;
     let blobGeneratedAt: string | null = null;
     let blobTierCounts: Record<string, number> = {};
-    let blobImoSample: { imo_number: string; tier: number; cruise_type: string | null }[] = [];
+    let blobImoSample: { mmsi: number; imo_number: string; tier: number; cruise_type: string | null }[] = [];
     let joinMatched = 0;
     let joinMismatched = 0;
-    let joinMismatchSample: { display_name: string; imo_number: string }[] = [];
+    let joinMismatchSample: { display_name: string; mmsi: number }[] = [];
     try {
       const buf = await readCoverageBlob();
       if (!buf) throw new Error("blob not found — cron has not run yet");
@@ -64,24 +64,25 @@ export async function GET() {
       blobShipCount = payload.ships.length;
 
       // Build the metadata index from the *uncached* fetch result we already have above.
-      const metaIndex = new Map<string, unknown>();
+      const metaIndex = new Map<number, unknown>();
       try {
         const parsed = await fetchShipMetadataUncached();
-        for (const r of parsed) metaIndex.set(r.imo_number, r);
+        for (const r of parsed) metaIndex.set(r.mmsi, r);
       } catch { /* surfaced separately above */ }
 
       for (const s of payload.ships) {
         const tk = String(s.tier);
         blobTierCounts[tk] = (blobTierCounts[tk] || 0) + 1;
-        const meta = metaIndex.get(s.imo_number);
+        const meta = metaIndex.get(s.mmsi);
         if (meta) joinMatched++; else {
           joinMismatched++;
           if (joinMismatchSample.length < 8) {
-            joinMismatchSample.push({ display_name: s.display_name, imo_number: JSON.stringify(s.imo_number) });
+            joinMismatchSample.push({ display_name: s.display_name, mmsi: s.mmsi });
           }
         }
       }
       blobImoSample = payload.ships.slice(0, 5).map(s => ({
+        mmsi: s.mmsi,
         imo_number: s.imo_number,
         tier: s.tier,
         cruise_type: s.cruise_type,
