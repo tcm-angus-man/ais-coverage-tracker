@@ -7,6 +7,10 @@ export type TeamMember = {
   db_user_id: string | null; // matches updated_by column (stored as text)
   role: Role;
   active: boolean;
+  // Override for the local-part of the Google account when it differs from slug.
+  // Ai-ai's slug is "ai-ai" (used in colors, LIVE_DATA_TEAM, filters) but her
+  // email is aiai@thecruisemaps.com.
+  email_local?: string;
 };
 
 // Maps db updated_by value → display name. data-platform is the system default
@@ -22,7 +26,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   { slug: "nick",     display_name: "Nick",     db_user_id: "19", role: "cleaner",  active: true },
   { slug: "nicole",   display_name: "Nicole",   db_user_id: "21", role: "cleaner",  active: true },
   { slug: "jayziel",  display_name: "Jayziel",  db_user_id: "22", role: "cleaner",  active: true },
-  { slug: "ai-ai",    display_name: "Ai-ai",    db_user_id: "23", role: "cleaner",  active: true },
+  { slug: "ai-ai",    display_name: "Ai-ai",    db_user_id: "23", role: "cleaner",  active: true, email_local: "aiai" },
   { slug: "rome",     display_name: "Rome",     db_user_id: "26", role: "cleaner",  active: true },
   { slug: "rich",     display_name: "Rich",     db_user_id: "28", role: "assigner", active: true },
   { slug: "dave",     display_name: "Dave",     db_user_id: "29", role: "cleaner",  active: true },
@@ -39,7 +43,11 @@ const DOMAIN = "thecruisemaps.com";
 
 export async function lookupTeamMember(email: string): Promise<TeamMember | null> {
   const e = email.toLowerCase();
-  return TEAM_MEMBERS.find(m => m.active && `${m.slug}@${DOMAIN}` === e) ?? null;
+  return TEAM_MEMBERS.find(m => {
+    if (!m.active) return false;
+    const local = m.email_local ?? m.slug;
+    return `${local}@${DOMAIN}` === e;
+  }) ?? null;
 }
 
 export async function listTeamMembers(): Promise<TeamMember[]> {
