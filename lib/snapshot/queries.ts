@@ -20,14 +20,18 @@ import { VOYAGE_START, SILVER_START } from "./types";
 //   - `np` ("no print") on voyage cells: no obvious source given the
 //     universe is print-linked voyages. Set to 0 pending product call.
 
-// Universe of ships to include in the snapshot. Voyage side: ships with
-// mmsi, not river cruise, with at least one undeleted globe-visible voyage.
-// Silver side: ships whose mmsi appears in ais_silver_summary.
+// Universe of ships to include in the snapshot. A ship qualifies when:
+//   - is_river_cruise_ship = FALSE
+//   - mmsi IS NOT NULL
+//   - has ≥1 voyage that is undeleted, visible_on_globe = TRUE, starts
+//     after 2015-01-01, and has ≥1 undeleted print with is_cruise_globe=TRUE
 //
 // Multiple ship rows can share one mmsi (a hull renamed/resold keeps its
 // AIS identifier). We surface ALL such ships as separate rows; voyage_cells
 // and silver_cells are still keyed by mmsi, so duplicate-mmsi rows share
 // coverage data — that's intended, since AIS history is per-hull.
+// Kept in sync with scripts/fill-shared-mmsi.ts and scripts/prune-shared-mmsi.ts
+// so the snapshot universe and the ship_metadata sheet stay aligned.
 export async function fetchShips(pool: Pool): Promise<ShipRow[]> {
   // Metadata fields (cruise_type, service_start, service_end, tier) are
   // joined onto each row by buildSnapshot() from Google Sheets, not Postgres.
@@ -48,17 +52,16 @@ export async function fetchShips(pool: Pool): Promise<ShipRow[]> {
     FROM ships s
     WHERE s.is_river_cruise_ship = FALSE
       AND s.mmsi IS NOT NULL
-      AND (
-        EXISTS (
-          SELECT 1 FROM voyages v
-          WHERE v.ship_id = s.id
-            AND v.is_deleted = FALSE
-            AND v.visible_on_globe = TRUE
-        )
-        OR EXISTS (
-          SELECT 1 FROM ais_silver_summary ass
-          WHERE ass.mmsi = s.mmsi
-        )
+      AND EXISTS (
+        SELECT 1
+        FROM voyages v
+        JOIN prints p ON p.voyage_id = v.id
+        WHERE v.ship_id = s.id
+          AND v.is_deleted = FALSE
+          AND v.visible_on_globe = TRUE
+          AND v.start_date > DATE '2015-01-01'
+          AND p.is_deleted = FALSE
+          AND p.is_cruise_globe = TRUE
       )
     ORDER BY display_name ASC NULLS LAST, s.id ASC
   `);
