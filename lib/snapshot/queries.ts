@@ -20,70 +20,47 @@ import { VOYAGE_START, SILVER_START } from "./types";
 //   - `np` ("no print") on voyage cells: no obvious source given the
 //     universe is print-linked voyages. Set to 0 pending product call.
 
-// Universe of mmsis to include in the snapshot. Voyage side: ships with
-// mmsi, not river cruise, with at least one undeleted voyage. Silver side:
-// mmsis appearing in ais_silver_summary that map to a non-river-cruise
-// ship row. We dedupe by mmsi preferring the row with notes IS NULL.
+// Universe of ships to include in the snapshot. Voyage side: ships with
+// mmsi, not river cruise, with at least one undeleted globe-visible voyage.
+// Silver side: ships whose mmsi appears in ais_silver_summary.
+//
+// Multiple ship rows can share one mmsi (a hull renamed/resold keeps its
+// AIS identifier). We surface ALL such ships as separate rows; voyage_cells
+// and silver_cells are still keyed by mmsi, so duplicate-mmsi rows share
+// coverage data — that's intended, since AIS history is per-hull.
 export async function fetchShips(pool: Pool): Promise<ShipRow[]> {
   // Metadata fields (cruise_type, service_start, service_end, tier) are
   // joined onto each row by buildSnapshot() from Google Sheets, not Postgres.
   // We default them here so the row type is internally consistent.
   const result = await pool.query<ShipRow>(`
-    WITH voyage_universe AS (
-      SELECT DISTINCT s.mmsi
-      FROM ships s
-      WHERE s.is_river_cruise_ship = FALSE
-        AND s.mmsi IS NOT NULL
-        AND EXISTS (
-          SELECT 1
-          FROM voyages v
-          WHERE v.ship_id = s.id
-            AND v.is_deleted = FALSE
-        )
-    ),
-    silver_universe AS (
-      SELECT DISTINCT ass.mmsi::numeric AS mmsi
-      FROM ais_silver_summary ass
-      WHERE EXISTS (
-        SELECT 1 FROM ships s
-        WHERE s.mmsi = ass.mmsi
-          AND s.is_river_cruise_ship = FALSE
-      )
-    ),
-    mmsi_universe AS (
-      SELECT mmsi FROM voyage_universe
-      UNION
-      SELECT mmsi FROM silver_universe
-    ),
-    deduped AS (
-      SELECT DISTINCT ON (s.mmsi)
-        s.id,
-        s.mmsi,
-        s.name,
-        s.display_name,
-        s.cruise_line,
-        s.imo_number,
-        s.in_service,
-        s.notes
-      FROM ships s
-      JOIN mmsi_universe u ON u.mmsi = s.mmsi
-      WHERE s.is_river_cruise_ship = FALSE
-      ORDER BY s.mmsi, (s.notes IS NULL) DESC, s.id ASC
-    )
     SELECT
-      d.id,
-      d.mmsi::int AS mmsi,
-      COALESCE(d.name, '')::text AS name,
-      COALESCE(d.display_name, d.name, '')::text AS display_name,
-      COALESCE(d.cruise_line, '')::text AS cruise_line,
-      COALESCE(d.imo_number::text, '') AS imo_number,
-      COALESCE(d.in_service, FALSE) AS in_service,
+      s.id,
+      s.mmsi::int AS mmsi,
+      COALESCE(s.name, '')::text AS name,
+      COALESCE(s.display_name, s.name, '')::text AS display_name,
+      COALESCE(s.cruise_line, '')::text AS cruise_line,
+      COALESCE(s.imo_number::text, '') AS imo_number,
+      COALESCE(s.in_service, FALSE) AS in_service,
       NULL::text AS cruise_type,
       NULL::text AS service_start,
       NULL::text AS service_end,
       4::int     AS tier
-    FROM deduped d
-    ORDER BY display_name ASC NULLS LAST
+    FROM ships s
+    WHERE s.is_river_cruise_ship = FALSE
+      AND s.mmsi IS NOT NULL
+      AND (
+        EXISTS (
+          SELECT 1 FROM voyages v
+          WHERE v.ship_id = s.id
+            AND v.is_deleted = FALSE
+            AND v.visible_on_globe = TRUE
+        )
+        OR EXISTS (
+          SELECT 1 FROM ais_silver_summary ass
+          WHERE ass.mmsi = s.mmsi
+        )
+      )
+    ORDER BY display_name ASC NULLS LAST, s.id ASC
   `);
   return result.rows;
 }
