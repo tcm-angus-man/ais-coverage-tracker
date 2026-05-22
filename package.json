@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "snapshot:local": "node --env-file=.env.local node_modules/.bin/tsx scripts/snapshot-local.ts",
-    "sheets:dump": "tsx scripts/sheets-dump.ts"
+    "sheets:dump": "tsx scripts/sheets-dump.ts",
+    "tier:coverage": "node --env-file=.env.local node_modules/.bin/tsx scripts/tier-print-coverage.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",
@@ -33,6 +34,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.49",
+    "server-only": "^0.0.1",
     "tailwindcss": "^3.4.15",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
