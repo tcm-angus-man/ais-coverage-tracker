@@ -38,7 +38,7 @@ const ASSIGNEE_COLOR_DEFAULT = "#e8c170"; // amber
 const C_UPDATED = "#5fa8f7";
 
 const HEADER_H = 36;
-const HEADER_W = 200;
+const HEADER_W = 260;
 
 type Density = "compact" | "default" | "roomy";
 const DENSITY_SIZES: Record<Density, { w: number; h: number }> = {
@@ -417,6 +417,39 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     }
   }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates, ships]);
 
+  // Per-ship coverage % shown in the left header bar.
+  // Voyage / combined: visible-day coverage with OOS days excluded (COVID adjustment skipped here for simplicity).
+  // Silver: clean-day ratio over the silver window.
+  const shipCoverage = useMemo(() => {
+    const out = new Map<number, number>();
+    if (isSilver) {
+      for (let i = 0; i < ships.length; i++) {
+        const ship = ships[i];
+        let clean = 0, total = 0;
+        for (let d = silverDateOffset; d < dates.length; d++) {
+          if (isOutOfService(ship, dates[d])) continue;
+          const cell = silver.cells[i][d];
+          total++;
+          if (cell && cell.t > 0 && (cell.dt + cell.dd + cell.sp + cell.ol) === 0) clean++;
+        }
+        out.set(i, total === 0 ? 0 : (clean / total) * 100);
+      }
+    } else {
+      for (let i = 0; i < ships.length; i++) {
+        const ship = ships[i];
+        let visible = 0, total = 0;
+        for (let d = 0; d < dates.length; d++) {
+          if (isOutOfService(ship, dates[d])) continue;
+          const cell = voyage.cells[i][d];
+          total++;
+          if (cell && cell.v >= 1) visible++;
+        }
+        out.set(i, total === 0 ? 0 : (visible / total) * 100);
+      }
+    }
+    return out;
+  }, [isSilver, ships, dates, silverDateOffset, voyage, silver]);
+
   const rowCount = baseShipIdx.length;
   const colCount = activeDates.length;
   const totalW = HEADER_W + colCount * CELL_W;
@@ -505,11 +538,6 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           const style = cell ? voyageCellStyle(cell) : null;
           ctx.fillStyle = style ? style.fill : C_MISSING;
           ctx.fillRect(cx, y, cw, ch);
-          if (style?.border) {
-            ctx.strokeStyle = style.border;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(cx + 0.5, y + 0.5, cw - 1, ch - 1);
-          }
         } else if (mode === "silver") {
           const cell = silver.cells[shipIdx][di];
           ctx.fillStyle = cell ? (silverCellColor(cell) ?? C_MISSING) : C_MISSING;
@@ -598,14 +626,46 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     ctx.clip();
     ctx.font = "11px 'JetBrains Mono', ui-monospace, monospace";
     ctx.textBaseline = "middle";
+    // Layout: name | bar | "NN%"
+    const PCT_W  = 34;
+    const BAR_W  = 56;
+    const BAR_H  = 6;
+    const PAD_R  = 8;
+    const GAP    = 8;
+    const barX   = HEADER_W - PAD_R - PCT_W - GAP - BAR_W;
+    const pctX   = HEADER_W - PAD_R;
+    const nameMaxPx = barX - 10 - GAP;
+    const nameMaxChars = Math.max(4, Math.floor(nameMaxPx / 7));
     for (let r = firstRow; r <= lastRow; r++) {
       const shipIdx = baseShipIdx[r];
       const ship = ships[shipIdx];
       const yTop = HEADER_H + r * CELL_H - sy;
+      const yMid = yTop + CELL_H / 2;
       if (r % 2 === 0) { ctx.fillStyle = C_PANEL; ctx.fillRect(0, yTop, HEADER_W, CELL_H); }
       ctx.fillStyle = ship.in_service ? C_INK : C_INK_FAINT;
-      ctx.fillText(ship.display_name.slice(0, 26), 10, yTop + CELL_H / 2);
+      ctx.textAlign = "left";
+      ctx.fillText(ship.display_name.slice(0, nameMaxChars), 10, yMid);
+
+      // Coverage bar + %
+      const pct = shipCoverage.get(shipIdx) ?? 0;
+      const fillW = Math.max(0, Math.min(1, pct / 100)) * BAR_W;
+      const barY = yMid - BAR_H / 2;
+      const barColor = pct >= 50 ? C_VISIBLE : pct >= 20 ? C_DW : C_NO_AIS;
+      ctx.fillStyle = C_BG;
+      ctx.fillRect(barX, barY, BAR_W, BAR_H);
+      ctx.fillStyle = barColor;
+      ctx.fillRect(barX, barY, fillW, BAR_H);
+      ctx.strokeStyle = C_LINE;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barX + 0.5, barY + 0.5, BAR_W - 1, BAR_H - 1);
+
+      ctx.fillStyle = ship.in_service ? C_INK_DIM : C_INK_FAINT;
+      ctx.textAlign = "right";
+      ctx.font = "10px 'JetBrains Mono', ui-monospace, monospace";
+      ctx.fillText(`${Math.round(pct)}%`, pctX, yMid);
+      ctx.font = "11px 'JetBrains Mono', ui-monospace, monospace";
     }
+    ctx.textAlign = "left";
     ctx.restore();
 
     // Corner + border lines (0.5px, subtle)
@@ -1096,9 +1156,10 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
       background: C_PANEL, border: `1px solid ${C_LINE}`,
       borderRadius: 4, padding: "10px 14px", fontSize: 11, color: C_INK,
       boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+      maxWidth: 280, whiteSpace: "nowrap",
       left: x + 14, top: y - 8,
       transform: [
-        x > window.innerWidth - 260 ? "translateX(-110%)" : "",
+        x > window.innerWidth - 300 ? "translateX(calc(-100% - 28px))" : "",
         y > window.innerHeight - 200 ? "translateY(-100%)" : "",
       ].filter(Boolean).join(" ") || undefined,
     }}>
