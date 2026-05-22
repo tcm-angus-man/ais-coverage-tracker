@@ -186,7 +186,7 @@ function drawOutOfServiceCell(ctx: CanvasRenderingContext2D, x: number, y: numbe
 }
 
 // ---------- types ----------
-type SortKey = "name" | "coverage" | "activity" | "imo" | "cruise_line";
+type SortKey = "name" | "coverage_pct" | "coverage_days" | "activity" | "imo" | "cruise_line";
 
 type AssignmentInfo = { assignee: string; status: string; id: string; notes?: string; dateStart: string; dateEnd: string };
 type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: Cell; silver?: Cell; assignment?: AssignmentInfo } | null;
@@ -194,11 +194,12 @@ type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: C
 type DragState = { r0: number; c0: number; r1: number; c1: number } | null;
 
 const SORT_OPTIONS: { k: SortKey; label: string }[] = [
-  { k: "name",       label: "Name A→Z" },
-  { k: "coverage",   label: "Coverage %" },
-  { k: "activity",   label: "Last activity" },
-  { k: "imo",        label: "IMO number" },
-  { k: "cruise_line", label: "Cruise line" },
+  { k: "name",          label: "Name A→Z" },
+  { k: "coverage_pct",  label: "Coverage %" },
+  { k: "coverage_days", label: "Coverage days" },
+  { k: "activity",      label: "Last activity" },
+  { k: "imo",           label: "IMO number" },
+  { k: "cruise_line",   label: "Cruise line" },
 ];
 
 const DENSITY_OPTIONS: { k: Density; label: string }[] = [
@@ -288,6 +289,39 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     return mmsis;
   }, [assigneeFilter, assignments]);
 
+  // Per-ship coverage % shown in the left header bar.
+  // Voyage / combined: visible-day coverage with OOS days excluded (COVID adjustment skipped here for simplicity).
+  // Silver: clean-day ratio over the silver window.
+  const shipCoverage = useMemo(() => {
+    const out = new Map<number, number>();
+    if (isSilver) {
+      for (let i = 0; i < ships.length; i++) {
+        const ship = ships[i];
+        let clean = 0, total = 0;
+        for (let d = silverDateOffset; d < dates.length; d++) {
+          if (isOutOfService(ship, dates[d])) continue;
+          const cell = silver.cells[i][d];
+          total++;
+          if (cell && cell.t > 0 && (cell.dt + cell.dd + cell.sp + cell.ol) === 0) clean++;
+        }
+        out.set(i, total === 0 ? 0 : (clean / total) * 100);
+      }
+    } else {
+      for (let i = 0; i < ships.length; i++) {
+        const ship = ships[i];
+        let visible = 0, total = 0;
+        for (let d = 0; d < dates.length; d++) {
+          if (isOutOfService(ship, dates[d])) continue;
+          const cell = voyage.cells[i][d];
+          total++;
+          if (cell && cell.v >= 1) visible++;
+        }
+        out.set(i, total === 0 ? 0 : (visible / total) * 100);
+      }
+    }
+    return out;
+  }, [isSilver, ships, dates, silverDateOffset, voyage, silver]);
+
   // Filtered + sorted ship index list
   const baseShipIdx = useMemo(() => {
     let idxs = ships.map((_, i) => i).filter(i => {
@@ -304,7 +338,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       return true;
     });
 
-    if (sort === "coverage") {
+    if (sort === "coverage_pct") {
+      idxs.sort((a, b) => (shipCoverage.get(b) ?? 0) - (shipCoverage.get(a) ?? 0));
+    } else if (sort === "coverage_days") {
       idxs.sort((a, b) => {
         const cov = (i: number) => {
           const layer = isSilver ? silver : voyage;
@@ -332,7 +368,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       idxs.sort((a, b) => ships[a].display_name.localeCompare(ships[b].display_name));
     }
     return idxs;
-  }, [ships, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeMmsis, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver]);
+  }, [ships, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeMmsis, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver, shipCoverage]);
 
   // KPIs — filter-aware
   const kpis = useMemo(() => {
@@ -416,39 +452,6 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
     }
   }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates, ships]);
-
-  // Per-ship coverage % shown in the left header bar.
-  // Voyage / combined: visible-day coverage with OOS days excluded (COVID adjustment skipped here for simplicity).
-  // Silver: clean-day ratio over the silver window.
-  const shipCoverage = useMemo(() => {
-    const out = new Map<number, number>();
-    if (isSilver) {
-      for (let i = 0; i < ships.length; i++) {
-        const ship = ships[i];
-        let clean = 0, total = 0;
-        for (let d = silverDateOffset; d < dates.length; d++) {
-          if (isOutOfService(ship, dates[d])) continue;
-          const cell = silver.cells[i][d];
-          total++;
-          if (cell && cell.t > 0 && (cell.dt + cell.dd + cell.sp + cell.ol) === 0) clean++;
-        }
-        out.set(i, total === 0 ? 0 : (clean / total) * 100);
-      }
-    } else {
-      for (let i = 0; i < ships.length; i++) {
-        const ship = ships[i];
-        let visible = 0, total = 0;
-        for (let d = 0; d < dates.length; d++) {
-          if (isOutOfService(ship, dates[d])) continue;
-          const cell = voyage.cells[i][d];
-          total++;
-          if (cell && cell.v >= 1) visible++;
-        }
-        out.set(i, total === 0 ? 0 : (visible / total) * 100);
-      }
-    }
-    return out;
-  }, [isSilver, ships, dates, silverDateOffset, voyage, silver]);
 
   const rowCount = baseShipIdx.length;
   const colCount = activeDates.length;
@@ -991,8 +994,14 @@ function CruiseLineDropdown({ options, selected, onToggle, onClear }: {
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const count = selected.size;
   const label = count === 0 ? "All lines" : count === 1 ? Array.from(selected)[0] : `${count} lines`;
+  const filteredOptions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(cl => cl.toLowerCase().includes(q));
+  }, [options, query]);
 
   return (
     <div style={{ position: "relative" }}>
@@ -1014,13 +1023,23 @@ function CruiseLineDropdown({ options, selected, onToggle, onClear }: {
       {open && (
         <>
           {/* backdrop */}
-          <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => { setOpen(false); setQuery(""); }} />
           <div style={{
             position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50,
             background: C_PANEL, border: `1px solid ${C_LINE}`,
-            borderRadius: 3, minWidth: 200, maxHeight: 280, overflowY: "auto",
+            borderRadius: 3, minWidth: 220, maxHeight: 320, display: "flex", flexDirection: "column",
             boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
           }}>
+            <div style={{ padding: 6, borderBottom: `1px solid ${C_LINE}`, flexShrink: 0 }}>
+              <input
+                autoFocus
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search lines…"
+                style={{ width: "100%", padding: "5px 8px", background: C_BG, border: `1px solid ${C_LINE}`, borderRadius: 2, fontSize: 11, color: C_INK, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <div style={{ overflowY: "auto", flex: 1 }}>
             {count > 0 && (
               <button
                 onClick={() => { onClear(); setOpen(false); }}
@@ -1029,7 +1048,10 @@ function CruiseLineDropdown({ options, selected, onToggle, onClear }: {
                 Clear selection
               </button>
             )}
-            {options.map(cl => {
+            {filteredOptions.length === 0 && (
+              <div style={{ padding: "10px 12px", fontSize: 11, color: C_INK_FAINT, fontStyle: "italic" }}>No matches</div>
+            )}
+            {filteredOptions.map(cl => {
               const on = selected.has(cl);
               return (
                 <div
@@ -1059,6 +1081,7 @@ function CruiseLineDropdown({ options, selected, onToggle, onClear }: {
                 </div>
               );
             })}
+            </div>
           </div>
         </>
       )}
