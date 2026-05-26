@@ -20,7 +20,7 @@ export type ShipRow = {
 };
 
 export type VoyageCellRow = {
-  mmsi: number;
+  ship_id: number;
   date: string; // YYYY-MM-DD
   t: number;
   v: number;
@@ -29,6 +29,9 @@ export type VoyageCellRow = {
   np: number;
 };
 
+// Silver rows come from ais_silver_summary which is keyed by MMSI in Postgres
+// (AIS pings are per-hull, not per-ship-record). The builder fans these out
+// to each ship_id sharing the MMSI, attributing by service window.
 export type SilverCellRow = {
   mmsi: number;
   date: string;

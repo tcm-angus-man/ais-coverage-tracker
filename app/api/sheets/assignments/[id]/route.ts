@@ -55,7 +55,7 @@ export async function PATCH(
     }
 
     // Find the row in the sheet
-    const rows = await sheetsGet("assignments!A:M");
+    const rows = await sheetsGet("assignments!A:N");
     // rows[0] is header, data starts at rows[1] (sheet row 2)
     const idCol = ASSIGNMENTS_COLUMNS.indexOf("assignment_id");
     const dataRows = rows.slice(1);
@@ -95,7 +95,7 @@ export async function PATCH(
     updated[ASSIGNMENTS_COLUMNS.indexOf("updated_at")] = now;
     updated[ASSIGNMENTS_COLUMNS.indexOf("updated_by")] = actorSlug;
 
-    const range = `assignments!A${sheetRow}:M${sheetRow}`;
+    const range = `assignments!A${sheetRow}:N${sheetRow}`;
     await sheetsUpdateRow(range, updated);
 
     // Audit log (best-effort)

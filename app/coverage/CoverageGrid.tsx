@@ -119,12 +119,13 @@ function indexPayload(payload: CoveragePayload): Indexed {
   const dateIdx = new Map<string, number>();
   for (let i = 0; i < dates.length; i++) dateIdx.set(dates[i], i);
 
+  // silverShipSet keyed by ship.id — cells are now ship_id-keyed, not mmsi.
   const silverShipSet = new Set<number>(Object.keys(payload.silver_cells).map(Number));
 
   const buildLayer = (layer: Record<string, Record<string, Cell>>): LayerMeta => {
     const cells: (Cell | null)[][] = [];
     for (const s of ships) {
-      const row = layer[String(s.mmsi)];
+      const row = layer[String(s.id)];
       const arr: (Cell | null)[] = new Array(dates.length).fill(null);
       if (row) for (const d in row) { const i = dateIdx.get(d); if (i !== undefined) arr[i] = row[d]; }
       cells.push(arr);
@@ -247,16 +248,32 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const activeDates      = isSilver ? silverDates : dates;
   const activeDateOffset = isSilver ? silverDateOffset : 0;
 
-  // Map "mmsi|YYYY-MM-DD" → { assignee, status } for every ship-day covered
-  // by an active (non-done) assignment. Used for dot rendering and tooltips.
-  // Clamp iteration to the silver date window to avoid expanding bulk
-  // month-range assignments into hundreds of thousands of map entries.
+  // Resolve a legacy MMSI-only assignment to a ship_id by scanning the
+  // current ship list. Returns 0 when no match (the row gets dropped).
+  // For shared-MMSI hulls this binds the legacy row to whichever ship sorts
+  // first — acceptable since shared MMSIs are rare and operators can
+  // backfill ship_id manually.
+  const shipIdByMmsi = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const s of ships) {
+      if (!m.has(s.mmsi)) m.set(s.mmsi, s.id);
+    }
+    return m;
+  }, [ships]);
+
+  // Map "ship_id|YYYY-MM-DD" → { assignee, status } for every ship-day
+  // covered by an active (non-done) assignment. Clamp iteration to the
+  // silver date window to avoid expanding bulk month-range assignments
+  // into hundreds of thousands of map entries.
   const assignedCells = useMemo(() => {
     const map = new Map<string, AssignmentInfo>();
     const windowStart = new Date(silverDates[0] + "T00:00:00Z");
     const windowEnd   = new Date(silverDates[silverDates.length - 1] + "T00:00:00Z");
     for (const a of assignments) {
-      if (!a.ship_mmsi || !a.date_start || !a.date_end) continue;
+      if (!a.date_start || !a.date_end) continue;
+      // Prefer ship_id on the row; fall back to MMSI lookup for legacy rows.
+      const shipId = a.ship_id || (a.ship_mmsi ? shipIdByMmsi.get(a.ship_mmsi) ?? 0 : 0);
+      if (!shipId) continue;
       const status = a.status ?? "queued";
       if (status === "done") continue;
       const assignee = a.assignee ?? "";
@@ -268,11 +285,11 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const end   = rawEnd   > windowEnd   ? windowEnd   : rawEnd;
       if (start > end) continue;
       for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
-        map.set(`${a.ship_mmsi}|${d.toISOString().slice(0, 10)}`, { assignee, status, id: a.id, notes: a.notes, dateStart: a.date_start, dateEnd: a.date_end });
+        map.set(`${shipId}|${d.toISOString().slice(0, 10)}`, { assignee, status, id: a.id, notes: a.notes, dateStart: a.date_start, dateEnd: a.date_end });
       }
     }
     return map;
-  }, [assignments, silverDates]);
+  }, [assignments, silverDates, shipIdByMmsi]);
 
   // Toggle a cruise line in/out of the multi-select set
   const toggleLine = useCallback((cl: string) => {
@@ -283,17 +300,18 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     });
   }, []);
 
-  // Set of mmsis that have at least one assigned day for the active assignee filter
-  const filteredAssigneeMmsis = useMemo(() => {
+  // Set of ship_ids that have at least one assigned day for the active assignee filter.
+  // Legacy MMSI-only rows are resolved via shipIdByMmsi.
+  const filteredAssigneeShipIds = useMemo(() => {
     if (!assigneeFilter) return null;
-    const mmsis = new Set<number>();
+    const ids = new Set<number>();
     for (const a of assignments) {
-      if ((a.assignee ?? "") === assigneeFilter && a.status !== "done" && a.ship_mmsi) {
-        mmsis.add(a.ship_mmsi);
-      }
+      if ((a.assignee ?? "") !== assigneeFilter || a.status === "done") continue;
+      const shipId = a.ship_id || (a.ship_mmsi ? shipIdByMmsi.get(a.ship_mmsi) ?? 0 : 0);
+      if (shipId) ids.add(shipId);
     }
-    return mmsis;
-  }, [assigneeFilter, assignments]);
+    return ids;
+  }, [assigneeFilter, assignments, shipIdByMmsi]);
 
   // Per-ship coverage % shown in the left header bar.
   // Voyage / combined: visible-day coverage with OOS days excluded AND the
@@ -425,11 +443,11 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const baseShipIdx = useMemo(() => {
     let idxs = ships.map((_, i) => i).filter(i => {
       const s = ships[i];
-      if (isSilver && !silverShipSet.has(s.mmsi)) return false;
+      if (isSilver && !silverShipSet.has(s.id)) return false;
       if (inServiceOnly && !s.in_service) return false;
       if (selectedTiers.size > 0 && !selectedTiers.has(s.tier)) return false;
       if (selectedLines.size > 0 && !selectedLines.has(s.cruise_line)) return false;
-      if (filteredAssigneeMmsis && !filteredAssigneeMmsis.has(s.mmsi)) return false;
+      if (filteredAssigneeShipIds && !filteredAssigneeShipIds.has(s.id)) return false;
       if (filter.trim()) {
         const q = filter.toLowerCase();
         return s.display_name.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.cruise_line.toLowerCase().includes(q) || String(s.mmsi).includes(q);
@@ -467,7 +485,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       idxs.sort((a, b) => ships[a].display_name.localeCompare(ships[b].display_name));
     }
     return idxs;
-  }, [ships, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeMmsis, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver, shipCoverage]);
+  }, [ships, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeShipIds, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver, shipCoverage]);
 
   // KPIs — filter-aware
   const kpis = useMemo(() => {
@@ -655,7 +673,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
             ctx.strokeRect(cx + 0.5, y + 0.5, cw - 1, ch - 1);
           }
           // Assignment dot — top-right corner, coloured by assignee
-          const info = assignedCells.get(`${ships[shipIdx].mmsi}|${dates[di]}`);
+          const info = assignedCells.get(`${ships[shipIdx].id}|${dates[di]}`);
           const dotVisible = info && (!assigneeFilter || info.assignee === assigneeFilter);
           if (dotVisible) {
             const r = Math.max(1.5, Math.min(2.5, CELL_W / 5));
@@ -812,9 +830,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     if (!hit) { setTooltip(null); return; }
     const ship = ships[hit.shipIdx];
     const date = dates[hit.dateIdx];
-    const v = payload.voyage_cells[String(ship.mmsi)]?.[date];
-    const s = payload.silver_cells[String(ship.mmsi)]?.[date];
-    const assignment = assignedCells.get(`${ship.mmsi}|${date}`);
+    const v = payload.voyage_cells[String(ship.id)]?.[date];
+    const s = payload.silver_cells[String(ship.id)]?.[date];
+    const assignment = assignedCells.get(`${ship.id}|${date}`);
     setTooltip({ x: e.clientX, y: e.clientY, ship, date, voyage: v, silver: s, assignment });
     if (isDragging.current && mode === "silver") {
       setDrag(prev => prev ? { ...prev, r1: hit.r, c1: hit.c } : prev);
@@ -837,7 +855,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       // assignment). Bulk month-range rows covering this date should not block
       // creating a new targeted assignment on top.
       const isSingleCell = drag.r0 === drag.r1 && drag.c0 === drag.c1;
-      const existing = isSingleCell ? assignedCells.get(`${ship.mmsi}|${dateStart}`) : undefined;
+      const existing = isSingleCell ? assignedCells.get(`${ship.id}|${dateStart}`) : undefined;
       if (existing) {
         // Open edit modal using the assignment's own date range (may be a month-range bulk row)
         setEditModal({ assignment: existing, ship, dateStart: existing.dateStart, dateEnd: existing.dateEnd });
@@ -999,6 +1017,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
             const id = crypto.randomUUID();
             const draft = {
               id,
+              ship_id: assignModal.ship.id,
               ship_mmsi: assignModal.ship.mmsi,
               ship_name: assignModal.ship.display_name,
               cruise_line: assignModal.ship.cruise_line,

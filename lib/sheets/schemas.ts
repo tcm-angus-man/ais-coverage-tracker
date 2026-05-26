@@ -1,6 +1,9 @@
 // Canonical column order for each Sheets tab.
 // If you add a column here, also update the header row in the sheet and bump the /sync-sheet check.
 
+// ship_id is appended at the end so existing rows keep their positional
+// alignment. Legacy rows (no ship_id) get resolved at read-time by looking
+// up the first ship matching ship_mmsi.
 export const ASSIGNMENTS_COLUMNS = [
   "assignment_id",
   "created_at",
@@ -15,6 +18,7 @@ export const ASSIGNMENTS_COLUMNS = [
   "notes",
   "updated_at",
   "updated_by",
+  "ship_id",
 ] as const;
 
 export const AUDIT_LOG_COLUMNS = [

@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const AssignmentSchema = z.object({
   assignment_id: z.string().uuid(),
+  ship_id:       z.number().int().positive(),
   ship_mmsi:     z.number().int(),
   ship_name:     z.string().min(1),
   cruise_line:   z.string(),
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
       d.notes ? `[${actor} @ ${now}]\n${d.notes}` : "",
       now,             // updated_at
       actor,           // updated_by
+      d.ship_id,
     ];
 
     const auditRow = [
@@ -73,7 +75,7 @@ export async function POST(req: Request) {
 
     // Assignment write must succeed; audit failure is best-effort
     const [assignResult, auditResult] = await Promise.allSettled([
-      sheetsAppend("assignments!A:M", [assignmentRow]),
+      sheetsAppend("assignments!A:N", [assignmentRow]),
       sheetsAppend("audit_log!A:G",   [auditRow]),
     ]);
 

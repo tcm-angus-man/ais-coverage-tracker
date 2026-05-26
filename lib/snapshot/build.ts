@@ -47,8 +47,8 @@ export async function buildSnapshot(): Promise<BuildResult> {
 
   const voyage_cells: Record<string, Record<string, Cell>> = {};
   for (const r of voyageRows) {
-    const m = String(r.mmsi);
-    (voyage_cells[m] ??= {})[r.date] = {
+    const k = String(r.ship_id);
+    (voyage_cells[k] ??= {})[r.date] = {
       t: r.t,
       v: r.v,
       na: r.na,
@@ -61,10 +61,25 @@ export async function buildSnapshot(): Promise<BuildResult> {
     };
   }
 
+  // Silver cells live in Postgres keyed by MMSI (per-hull AIS pings). We fan
+  // each silver row out to every ship_id sharing the MMSI, attributing the
+  // row to a ship only when the date falls inside that ship's
+  // service_start..service_end window (from ship_metadata sheet). Ships
+  // missing a service window get *all* their MMSI's silver — the window is
+  // the only way to disambiguate hull-shared MMSIs, so an open window means
+  // "no opinion, take everything".
+  const shipsByMmsi = new Map<number, typeof ships>();
+  for (const s of ships) {
+    const arr = shipsByMmsi.get(s.mmsi) ?? [];
+    arr.push(s);
+    shipsByMmsi.set(s.mmsi, arr);
+  }
+
   const silver_cells: Record<string, Record<string, Cell>> = {};
   for (const r of silverRows) {
-    const m = String(r.mmsi);
-    (silver_cells[m] ??= {})[r.date] = {
+    const shipsForMmsi = shipsByMmsi.get(r.mmsi);
+    if (!shipsForMmsi || shipsForMmsi.length === 0) continue;
+    const cell: Cell = {
       t: r.t,
       v: r.v,
       na: r.na,
@@ -77,6 +92,18 @@ export async function buildSnapshot(): Promise<BuildResult> {
       u: r.u,
       ...(r.updated_by != null ? { updated_by: r.updated_by } : {}),
     };
+    for (const s of shipsForMmsi) {
+      const meta = metadataByMmsi.get(s.mmsi);
+      const start = meta?.service_start ?? null;
+      const end = meta?.service_end ?? null;
+      // Service window is per-MMSI in the sheet, so it's identical for every
+      // ship sharing the MMSI — meaning shared-MMSI ships will currently
+      // receive identical silver. That's a known limitation; surfacing
+      // visibility is more important than perfect attribution here.
+      if (start && r.date < start) continue;
+      if (end && r.date > end) continue;
+      (silver_cells[String(s.id)] ??= {})[r.date] = cell;
+    }
   }
 
   const generated_at = new Date().toISOString();

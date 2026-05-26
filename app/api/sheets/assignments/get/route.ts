@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ ok: false, error: "unauthenticated" }, { status: 401 });
     }
 
-    const rows = await sheetsGet("assignments!A:M");
+    const rows = await sheetsGet("assignments!A:N");
     // Skip header row
     const data = rows.slice(1);
 
@@ -23,6 +23,7 @@ export async function GET() {
         id:          row[ASSIGNMENTS_COLUMNS.indexOf("assignment_id")] ?? "",
         created_at:  row[ASSIGNMENTS_COLUMNS.indexOf("created_at")]    ?? "",
         created_by:  row[ASSIGNMENTS_COLUMNS.indexOf("created_by")]    ?? "",
+        ship_id:     Number(row[ASSIGNMENTS_COLUMNS.indexOf("ship_id")]   ?? 0),
         ship_mmsi:   Number(row[ASSIGNMENTS_COLUMNS.indexOf("ship_mmsi")] ?? 0),
         ship_name:   row[ASSIGNMENTS_COLUMNS.indexOf("ship_name")]     ?? "",
         cruise_line: row[ASSIGNMENTS_COLUMNS.indexOf("cruise_line")]   ?? "",

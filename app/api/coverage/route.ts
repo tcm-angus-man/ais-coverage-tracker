@@ -64,21 +64,21 @@ function devFallback(): CoveragePayload {
   const voyage_cells: CoveragePayload["voyage_cells"] = {};
   const silver_cells: CoveragePayload["silver_cells"] = {};
   for (const s of ships) {
-    voyage_cells[String(s.mmsi)] = {};
-    silver_cells[String(s.mmsi)] = {};
+    voyage_cells[String(s.id)] = {};
+    silver_cells[String(s.id)] = {};
     for (let i = 0; i < dates.length; i++) {
       const d = dates[i];
       const seed = (s.mmsi + i * 31) % 17;
       if (seed > 2) {
         const t = (seed * 3) % 25;
         const v = Math.max(0, t - (seed % 5));
-        voyage_cells[String(s.mmsi)][d] = { t, v, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 };
+        voyage_cells[String(s.id)][d] = { t, v, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 };
       }
       const silverSeed = (s.mmsi + i * 13) % 19;
       if (silverSeed > 5 && i % 2 === 0) {
         const t = (silverSeed * 2) % 20;
         const v = Math.max(0, t - (silverSeed % 4));
-        silver_cells[String(s.mmsi)][d] = { t, v, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 };
+        silver_cells[String(s.id)][d] = { t, v, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 };
       }
     }
   }

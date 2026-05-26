@@ -68,25 +68,25 @@ export async function fetchShips(pool: Pool): Promise<ShipRow[]> {
   return result.rows;
 }
 
-// Voyage cells: per (mmsi, calendar day), counts voyages covering that day
+// Voyage cells: per (ship_id, calendar day), counts voyages covering that day
 // (not prints — the heatmap visualizes voyage *coverage*, not demand).
 //
-// Three CTEs:
-//   active_ships: per-mmsi active range [first voyage start, last voyage end]
-//                 clipped to [VOYAGE_START, today]
-//   voyage_days:  per (mmsi, day), the four voyage-derived counts
-//   gap_days:     per (mmsi, day), days inside active range with no voyages
+// Keyed by ship_id, not mmsi, because multiple ship rows can share a single
+// mmsi (a hull renamed/resold keeps its AIS identifier). Each ship_id should
+// only show coverage for its own voyages — voyages.ship_id is the join.
 //
-// gap_days produces np=1 cells so the heatmap can show "no request" gaps
-// between a ship's voyages (e.g. ship requested Jan 1–10 then Jan 12–20:
-// Jan 11 is a gap day, marked np=1).
+// Three CTEs:
+//   active_ships: per-ship_id active range [first voyage start, last voyage end]
+//                 clipped to [VOYAGE_START, today]
+//   voyage_days:  per (ship_id, day), the four voyage-derived counts
+//
+// Gap days (np=1) are emitted for any day in the active range with no voyages.
 export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
   const result = await pool.query<VoyageCellRow>(
     `
     WITH active_ships AS (
       SELECT
         s.id,
-        s.mmsi,
         GREATEST(MIN(v.start_date), $1::date) AS active_start,
         LEAST(MAX(v.end_date), CURRENT_DATE)  AS active_end
       FROM ships s
@@ -98,7 +98,7 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
         AND v.end_date IS NOT NULL
         AND v.end_date >= $1::date
         AND v.start_date <= CURRENT_DATE
-      GROUP BY s.id, s.mmsi
+      GROUP BY s.id
     ),
     voyage_days AS (
       -- Categories are mutually exclusive in priority order so v + na + dw + need_process = t.
@@ -107,7 +107,7 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
       -- undeleted print survives). A voyage with at least one undeleted print
       -- and a route file is still visible to customers, so it stays green.
       SELECT
-        s.mmsi,
+        v.ship_id,
         d::date AS day,
         COUNT(*)::int AS t,
         COUNT(*) FILTER (
@@ -149,10 +149,10 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
         AND v.end_date IS NOT NULL
         AND v.end_date >= $1::date
         AND v.start_date <= CURRENT_DATE
-      GROUP BY s.mmsi, d::date
+      GROUP BY v.ship_id, d::date
     )
     SELECT
-      a.mmsi::int AS mmsi,
+      a.id::int AS ship_id,
       to_char(d::date, 'YYYY-MM-DD') AS date,
       COALESCE(vd.t,  0)::int AS t,
       COALESCE(vd.v,  0)::int AS v,
@@ -166,7 +166,7 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
       '1 day'::interval
     ) AS d
     LEFT JOIN voyage_days vd
-      ON vd.mmsi = a.mmsi AND vd.day = d::date
+      ON vd.ship_id = a.id AND vd.day = d::date
     `,
     [VOYAGE_START],
   );

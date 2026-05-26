@@ -4,6 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 
 export type DraftAssignment = {
   id: string;
+  // ship_id is the authoritative key. Legacy rows from the sheet may have 0
+  // here — the renderer falls back to ship_mmsi lookup in that case.
+  ship_id: number;
   ship_mmsi: number;
   ship_name: string;
   cruise_line: string;
