@@ -100,48 +100,25 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
         AND v.start_date <= CURRENT_DATE
       GROUP BY s.id
     ),
-    voyage_days AS (
-      -- Categories are mutually exclusive in priority order so v + na + dw + need_process = t.
-      -- Precedence: no-AIS > details-wrong > visible > need-process. A voyage
-      -- counts as "no AIS" only when ALL its prints are deleted (i.e. no
-      -- undeleted print survives). A voyage with at least one undeleted print
-      -- and a route file is still visible to customers, so it stays green.
+    -- Pre-aggregate per voyage: "does any undeleted print exist?" — done once
+    -- per voyage instead of once per (voyage, day). This is the hot path:
+    -- without this rollup, the NOT EXISTS subquery runs on the order of
+    -- N_voyages * N_days_per_voyage times (~hundreds of millions) and times out.
+    eligible_voyages AS (
       SELECT
+        v.id,
         v.ship_id,
-        d::date AS day,
-        COUNT(*)::int AS t,
-        COUNT(*) FILTER (
-          WHERE NOT (
-                v.route_file_location IS NULL
-             OR v.globe_customer_notification = 'No data available'
-             OR NOT EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = FALSE)
-          )
-          AND NOT (v.globe_customer_notification = 'Details are wrong')
-          AND v.visible_on_globe = TRUE
-        )::int AS v,
-        COUNT(*) FILTER (
-          WHERE v.route_file_location IS NULL
-             OR v.globe_customer_notification = 'No data available'
-             OR NOT EXISTS (
-               SELECT 1 FROM prints p
-               WHERE p.voyage_id = v.id AND p.is_deleted = FALSE
-             )
-        )::int AS na,
-        COUNT(*) FILTER (
-          WHERE NOT (
-                v.route_file_location IS NULL
-             OR v.globe_customer_notification = 'No data available'
-             OR NOT EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = FALSE)
-          )
-          AND v.globe_customer_notification = 'Details are wrong'
-        )::int AS dw
+        v.start_date,
+        v.end_date,
+        v.route_file_location,
+        v.globe_customer_notification,
+        v.visible_on_globe,
+        EXISTS (
+          SELECT 1 FROM prints p
+          WHERE p.voyage_id = v.id AND p.is_deleted = FALSE
+        ) AS has_print
       FROM voyages v
       JOIN ships s ON s.id = v.ship_id
-      CROSS JOIN LATERAL generate_series(
-        GREATEST(v.start_date, $1::date),
-        LEAST(v.end_date, CURRENT_DATE),
-        '1 day'::interval
-      ) AS d
       WHERE v.is_deleted = FALSE
         AND s.is_river_cruise_ship = FALSE
         AND s.mmsi IS NOT NULL
@@ -149,7 +126,46 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
         AND v.end_date IS NOT NULL
         AND v.end_date >= $1::date
         AND v.start_date <= CURRENT_DATE
-      GROUP BY v.ship_id, d::date
+    ),
+    voyage_days AS (
+      -- Categories are mutually exclusive in priority order so v + na + dw + need_process = t.
+      -- Precedence: no-AIS > details-wrong > visible > need-process. A voyage
+      -- counts as "no AIS" only when ALL its prints are deleted (i.e. no
+      -- undeleted print survives). A voyage with at least one undeleted print
+      -- and a route file is still visible to customers, so it stays green.
+      SELECT
+        ev.ship_id,
+        d::date AS day,
+        COUNT(*)::int AS t,
+        COUNT(*) FILTER (
+          WHERE NOT (
+                ev.route_file_location IS NULL
+             OR ev.globe_customer_notification = 'No data available'
+             OR NOT ev.has_print
+          )
+          AND NOT (ev.globe_customer_notification = 'Details are wrong')
+          AND ev.visible_on_globe = TRUE
+        )::int AS v,
+        COUNT(*) FILTER (
+          WHERE ev.route_file_location IS NULL
+             OR ev.globe_customer_notification = 'No data available'
+             OR NOT ev.has_print
+        )::int AS na,
+        COUNT(*) FILTER (
+          WHERE NOT (
+                ev.route_file_location IS NULL
+             OR ev.globe_customer_notification = 'No data available'
+             OR NOT ev.has_print
+          )
+          AND ev.globe_customer_notification = 'Details are wrong'
+        )::int AS dw
+      FROM eligible_voyages ev
+      CROSS JOIN LATERAL generate_series(
+        GREATEST(ev.start_date, $1::date),
+        LEAST(ev.end_date, CURRENT_DATE),
+        '1 day'::interval
+      ) AS d
+      GROUP BY ev.ship_id, d::date
     )
     SELECT
       a.id::int AS ship_id,
