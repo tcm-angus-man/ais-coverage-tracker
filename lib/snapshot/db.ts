@@ -16,10 +16,7 @@ export function getPool(): Pool {
     connectionString: url,
     max: 4,
     idleTimeoutMillis: 10_000,
-    // Cron route's maxDuration is 300s. The voyage_cells query fans out
-    // every voyage across every active day via LATERAL generate_series, so
-    // a 10-year window across 700+ ships needs more than 60s headroom.
-    statement_timeout: 280_000,
+    statement_timeout: 60_000,
     ssl: isLocal ? false : { rejectUnauthorized: false },
   });
   return pool;

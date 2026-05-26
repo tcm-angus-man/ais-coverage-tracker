@@ -45,10 +45,36 @@ export async function buildSnapshot(): Promise<BuildResult> {
   const dates = buildDateAxis();
   const metadataByMmsi = indexByMmsi(metadata);
 
+  // Voyage and silver cells both live MMSI-keyed in the SQL result (SQL
+  // aggregation by ship_id was too slow). We fan each row out to every
+  // ship_id sharing the MMSI, attributed by service window so a renamed
+  // hull's old name doesn't show voyages from its new name's era.
+  const shipsByMmsi = new Map<number, typeof ships>();
+  for (const s of ships) {
+    const arr = shipsByMmsi.get(s.mmsi) ?? [];
+    arr.push(s);
+    shipsByMmsi.set(s.mmsi, arr);
+  }
+
+  // Per-ship service window comes from the ship_metadata sheet, indexed by
+  // MMSI. Today the window is shared across ships sharing an MMSI (sheet is
+  // MMSI-keyed), so this filter doesn't yet split shared-MMSI hulls — that
+  // requires either an imo_number-keyed sheet or per-ship-id windows. We
+  // still apply the filter so the structure is in place when those land.
+  function dateInWindow(s: (typeof ships)[number], date: string): boolean {
+    const meta = metadataByMmsi.get(s.mmsi);
+    const start = meta?.service_start ?? null;
+    const end = meta?.service_end ?? null;
+    if (start && date < start) return false;
+    if (end && date > end) return false;
+    return true;
+  }
+
   const voyage_cells: Record<string, Record<string, Cell>> = {};
   for (const r of voyageRows) {
-    const k = String(r.ship_id);
-    (voyage_cells[k] ??= {})[r.date] = {
+    const shipsForMmsi = shipsByMmsi.get(r.mmsi);
+    if (!shipsForMmsi || shipsForMmsi.length === 0) continue;
+    const cell: Cell = {
       t: r.t,
       v: r.v,
       na: r.na,
@@ -59,20 +85,10 @@ export async function buildSnapshot(): Promise<BuildResult> {
       sp: 0,
       ol: 0,
     };
-  }
-
-  // Silver cells live in Postgres keyed by MMSI (per-hull AIS pings). We fan
-  // each silver row out to every ship_id sharing the MMSI, attributing the
-  // row to a ship only when the date falls inside that ship's
-  // service_start..service_end window (from ship_metadata sheet). Ships
-  // missing a service window get *all* their MMSI's silver — the window is
-  // the only way to disambiguate hull-shared MMSIs, so an open window means
-  // "no opinion, take everything".
-  const shipsByMmsi = new Map<number, typeof ships>();
-  for (const s of ships) {
-    const arr = shipsByMmsi.get(s.mmsi) ?? [];
-    arr.push(s);
-    shipsByMmsi.set(s.mmsi, arr);
+    for (const s of shipsForMmsi) {
+      if (!dateInWindow(s, r.date)) continue;
+      (voyage_cells[String(s.id)] ??= {})[r.date] = cell;
+    }
   }
 
   const silver_cells: Record<string, Record<string, Cell>> = {};
@@ -93,15 +109,7 @@ export async function buildSnapshot(): Promise<BuildResult> {
       ...(r.updated_by != null ? { updated_by: r.updated_by } : {}),
     };
     for (const s of shipsForMmsi) {
-      const meta = metadataByMmsi.get(s.mmsi);
-      const start = meta?.service_start ?? null;
-      const end = meta?.service_end ?? null;
-      // Service window is per-MMSI in the sheet, so it's identical for every
-      // ship sharing the MMSI — meaning shared-MMSI ships will currently
-      // receive identical silver. That's a known limitation; surfacing
-      // visibility is more important than perfect attribution here.
-      if (start && r.date < start) continue;
-      if (end && r.date > end) continue;
+      if (!dateInWindow(s, r.date)) continue;
       (silver_cells[String(s.id)] ??= {})[r.date] = cell;
     }
   }

@@ -19,8 +19,11 @@ export type ShipRow = {
   tier: 1 | 2 | 3 | 4;
 };
 
+// Voyage cells live MMSI-keyed in the SQL result for performance — the
+// historically-tuned plan groups voyages by mmsi. The builder fans these
+// out to each ship_id sharing the MMSI, attributed by service window.
 export type VoyageCellRow = {
-  ship_id: number;
+  mmsi: number;
   date: string; // YYYY-MM-DD
   t: number;
   v: number;

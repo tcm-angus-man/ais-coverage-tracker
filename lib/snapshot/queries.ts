@@ -68,25 +68,18 @@ export async function fetchShips(pool: Pool): Promise<ShipRow[]> {
   return result.rows;
 }
 
-// Voyage cells: per (ship_id, calendar day), counts voyages covering that day
-// (not prints — the heatmap visualizes voyage *coverage*, not demand).
-//
-// Keyed by ship_id, not mmsi, because multiple ship rows can share a single
-// mmsi (a hull renamed/resold keeps its AIS identifier). Each ship_id should
-// only show coverage for its own voyages — voyages.ship_id is the join.
-//
-// Three CTEs:
-//   active_ships: per-ship_id active range [first voyage start, last voyage end]
-//                 clipped to [VOYAGE_START, today]
-//   voyage_days:  per (ship_id, day), the four voyage-derived counts
-//
-// Gap days (np=1) are emitted for any day in the active range with no voyages.
+// Voyage cells: per (mmsi, calendar day), counts voyages covering that day.
+// SQL aggregation stays MMSI-keyed because that's the historically tuned
+// query plan and ship_id grouping was hitting statement_timeout. The
+// builder fans each MMSI bucket out to every ship_id sharing the MMSI,
+// attributing by service window — same pattern used for silver cells.
 export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
   const result = await pool.query<VoyageCellRow>(
     `
     WITH active_ships AS (
       SELECT
         s.id,
+        s.mmsi,
         GREATEST(MIN(v.start_date), $1::date) AS active_start,
         LEAST(MAX(v.end_date), CURRENT_DATE)  AS active_end
       FROM ships s
@@ -98,34 +91,7 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
         AND v.end_date IS NOT NULL
         AND v.end_date >= $1::date
         AND v.start_date <= CURRENT_DATE
-      GROUP BY s.id
-    ),
-    -- Pre-aggregate per voyage: "does any undeleted print exist?" — done once
-    -- per voyage instead of once per (voyage, day). This is the hot path:
-    -- without this rollup, the NOT EXISTS subquery runs on the order of
-    -- N_voyages * N_days_per_voyage times (~hundreds of millions) and times out.
-    eligible_voyages AS (
-      SELECT
-        v.id,
-        v.ship_id,
-        v.start_date,
-        v.end_date,
-        v.route_file_location,
-        v.globe_customer_notification,
-        v.visible_on_globe,
-        EXISTS (
-          SELECT 1 FROM prints p
-          WHERE p.voyage_id = v.id AND p.is_deleted = FALSE
-        ) AS has_print
-      FROM voyages v
-      JOIN ships s ON s.id = v.ship_id
-      WHERE v.is_deleted = FALSE
-        AND s.is_river_cruise_ship = FALSE
-        AND s.mmsi IS NOT NULL
-        AND v.start_date IS NOT NULL
-        AND v.end_date IS NOT NULL
-        AND v.end_date >= $1::date
-        AND v.start_date <= CURRENT_DATE
+      GROUP BY s.id, s.mmsi
     ),
     voyage_days AS (
       -- Categories are mutually exclusive in priority order so v + na + dw + need_process = t.
@@ -134,41 +100,52 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
       -- undeleted print survives). A voyage with at least one undeleted print
       -- and a route file is still visible to customers, so it stays green.
       SELECT
-        ev.ship_id,
+        s.mmsi,
         d::date AS day,
         COUNT(*)::int AS t,
         COUNT(*) FILTER (
           WHERE NOT (
-                ev.route_file_location IS NULL
-             OR ev.globe_customer_notification = 'No data available'
-             OR NOT ev.has_print
+                v.route_file_location IS NULL
+             OR v.globe_customer_notification = 'No data available'
+             OR NOT EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = FALSE)
           )
-          AND NOT (ev.globe_customer_notification = 'Details are wrong')
-          AND ev.visible_on_globe = TRUE
+          AND NOT (v.globe_customer_notification = 'Details are wrong')
+          AND v.visible_on_globe = TRUE
         )::int AS v,
         COUNT(*) FILTER (
-          WHERE ev.route_file_location IS NULL
-             OR ev.globe_customer_notification = 'No data available'
-             OR NOT ev.has_print
+          WHERE v.route_file_location IS NULL
+             OR v.globe_customer_notification = 'No data available'
+             OR NOT EXISTS (
+               SELECT 1 FROM prints p
+               WHERE p.voyage_id = v.id AND p.is_deleted = FALSE
+             )
         )::int AS na,
         COUNT(*) FILTER (
           WHERE NOT (
-                ev.route_file_location IS NULL
-             OR ev.globe_customer_notification = 'No data available'
-             OR NOT ev.has_print
+                v.route_file_location IS NULL
+             OR v.globe_customer_notification = 'No data available'
+             OR NOT EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = FALSE)
           )
-          AND ev.globe_customer_notification = 'Details are wrong'
+          AND v.globe_customer_notification = 'Details are wrong'
         )::int AS dw
-      FROM eligible_voyages ev
+      FROM voyages v
+      JOIN ships s ON s.id = v.ship_id
       CROSS JOIN LATERAL generate_series(
-        GREATEST(ev.start_date, $1::date),
-        LEAST(ev.end_date, CURRENT_DATE),
+        GREATEST(v.start_date, $1::date),
+        LEAST(v.end_date, CURRENT_DATE),
         '1 day'::interval
       ) AS d
-      GROUP BY ev.ship_id, d::date
+      WHERE v.is_deleted = FALSE
+        AND s.is_river_cruise_ship = FALSE
+        AND s.mmsi IS NOT NULL
+        AND v.start_date IS NOT NULL
+        AND v.end_date IS NOT NULL
+        AND v.end_date >= $1::date
+        AND v.start_date <= CURRENT_DATE
+      GROUP BY s.mmsi, d::date
     )
     SELECT
-      a.id::int AS ship_id,
+      a.mmsi::int AS mmsi,
       to_char(d::date, 'YYYY-MM-DD') AS date,
       COALESCE(vd.t,  0)::int AS t,
       COALESCE(vd.v,  0)::int AS v,
@@ -182,7 +159,7 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
       '1 day'::interval
     ) AS d
     LEFT JOIN voyage_days vd
-      ON vd.ship_id = a.id AND vd.day = d::date
+      ON vd.mmsi = a.mmsi AND vd.day = d::date
     `,
     [VOYAGE_START],
   );
