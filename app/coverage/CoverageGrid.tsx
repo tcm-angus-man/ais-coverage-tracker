@@ -290,7 +290,10 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   }, [assigneeFilter, assignments]);
 
   // Per-ship coverage % shown in the left header bar.
-  // Voyage / combined: visible-day coverage with OOS days excluded (COVID adjustment skipped here for simplicity).
+  // Voyage / combined: visible-day coverage with OOS days excluded AND the
+  // same COVID adjustment as the top KPI bar — days in Mar 2020 – Nov 2021
+  // are excluded from the denominator unless the ship has a contiguous run
+  // of ≥10 visible days anchored within 7 days of either COVID boundary.
   // Silver: clean-day ratio over the silver window.
   const shipCoverage = useMemo(() => {
     const out = new Map<number, number>();
@@ -307,14 +310,52 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         out.set(i, total === 0 ? 0 : (clean / total) * 100);
       }
     } else {
+      const COVID_START = "2020-03-01";
+      const COVID_END   = "2021-11-30";
+      const covidStartIdx = dates.findIndex(d => d >= COVID_START);
+      const covidEndIdx   = (() => { let i = dates.length - 1; while (i >= 0 && dates[i] > COVID_END) i--; return i; })();
+      const covidWindowLen = (covidStartIdx >= 0 && covidEndIdx >= covidStartIdx) ? covidEndIdx - covidStartIdx + 1 : 0;
+
+      const qualifyingCovidIndices = (si: number): Set<number> => {
+        const qualifying = new Set<number>();
+        if (covidWindowLen <= 0) return qualifying;
+        let runStart = -1;
+        const flush = (runEnd: number) => {
+          if (runStart < 0) return;
+          const len = runEnd - runStart + 1;
+          const anchored =
+            (runStart - covidStartIdx) <= 7 ||
+            (covidEndIdx - runEnd)     <= 7;
+          if (len >= 10 && anchored) {
+            for (let i = runStart; i <= runEnd; i++) qualifying.add(i);
+          }
+          runStart = -1;
+        };
+        for (let d = covidStartIdx; d <= covidEndIdx; d++) {
+          const cell = voyage.cells[si][d];
+          if (cell && cell.v >= 1) {
+            if (runStart < 0) runStart = d;
+          } else {
+            flush(d - 1);
+          }
+        }
+        flush(covidEndIdx);
+        return qualifying;
+      };
+
       for (let i = 0; i < ships.length; i++) {
         const ship = ships[i];
+        const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(i) : null;
         let visible = 0, total = 0;
         for (let d = 0; d < dates.length; d++) {
           if (isOutOfService(ship, dates[d])) continue;
           const cell = voyage.cells[i][d];
+          const hasVisible = cell && cell.v >= 1;
+          const inCovid = covidWindowLen > 0 && d >= covidStartIdx && d <= covidEndIdx;
+          const covidExclude = inCovid && !hasVisible && !(qualifiedCovidIdx?.has(d));
+          if (covidExclude) continue;
           total++;
-          if (cell && cell.v >= 1) visible++;
+          if (hasVisible) visible++;
         }
         out.set(i, total === 0 ? 0 : (visible / total) * 100);
       }
