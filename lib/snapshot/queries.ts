@@ -103,7 +103,9 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
     voyage_days AS (
       -- Categories are mutually exclusive in priority order so v + na + dw + need_process = t.
       -- Precedence: no-AIS > details-wrong > visible > need-process. A voyage
-      -- with a deleted print or no data is "no AIS" regardless of other flags.
+      -- counts as "no AIS" only when ALL its prints are deleted (i.e. no
+      -- undeleted print survives). A voyage with at least one undeleted print
+      -- and a route file is still visible to customers, so it stays green.
       SELECT
         s.mmsi,
         d::date AS day,
@@ -112,7 +114,7 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
           WHERE NOT (
                 v.route_file_location IS NULL
              OR v.globe_customer_notification = 'No data available'
-             OR EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = TRUE)
+             OR NOT EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = FALSE)
           )
           AND NOT (v.globe_customer_notification = 'Details are wrong')
           AND v.visible_on_globe = TRUE
@@ -120,16 +122,16 @@ export async function fetchVoyageCells(pool: Pool): Promise<VoyageCellRow[]> {
         COUNT(*) FILTER (
           WHERE v.route_file_location IS NULL
              OR v.globe_customer_notification = 'No data available'
-             OR EXISTS (
+             OR NOT EXISTS (
                SELECT 1 FROM prints p
-               WHERE p.voyage_id = v.id AND p.is_deleted = TRUE
+               WHERE p.voyage_id = v.id AND p.is_deleted = FALSE
              )
         )::int AS na,
         COUNT(*) FILTER (
           WHERE NOT (
                 v.route_file_location IS NULL
              OR v.globe_customer_notification = 'No data available'
-             OR EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = TRUE)
+             OR NOT EXISTS (SELECT 1 FROM prints p WHERE p.voyage_id = v.id AND p.is_deleted = FALSE)
           )
           AND v.globe_customer_notification = 'Details are wrong'
         )::int AS dw
