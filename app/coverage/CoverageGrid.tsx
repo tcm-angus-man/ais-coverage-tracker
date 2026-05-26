@@ -166,6 +166,12 @@ function isOutOfService(ship: Ship, date: string): boolean {
 // viewer can tell "this ship wasn't active yet" from "no request on this day".
 const C_OUT_OF_SERVICE = "#1a232b";
 const C_OUT_OF_SERVICE_HATCH = "rgba(90,109,124,0.35)";
+
+// COVID-excluded days (per-ship, only days the COVID adjustment removed from
+// the denominator) render with a muted blue-grey tint so viewers can see at a
+// glance which cells the % doesn't penalise. Drawn as a semi-transparent
+// overlay so the underlying cell colour still shows through faintly.
+const C_COVID_EXCLUDED = "rgba(82,113,140,0.55)";
 function drawOutOfServiceCell(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
   ctx.fillStyle = C_OUT_OF_SERVICE;
   ctx.fillRect(x, y, w, h);
@@ -362,6 +368,58 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     }
     return out;
   }, [isSilver, ships, dates, silverDateOffset, voyage, silver]);
+
+  // Per-ship set of date indices excluded by the COVID adjustment, used to
+  // tint those cells on the canvas. A day is excluded when it falls in the
+  // COVID window AND this ship has no visible voyage on that day AND it
+  // is not part of a qualifying ≥10-day visible run anchored within 7 days
+  // of either COVID boundary. Voyage mode only.
+  const covidExcludedByShip = useMemo(() => {
+    const out = new Map<number, Set<number>>();
+    if (isSilver) return out;
+    const COVID_START = "2020-03-01";
+    const COVID_END   = "2021-11-30";
+    const covidStartIdx = dates.findIndex(d => d >= COVID_START);
+    const covidEndIdx   = (() => { let i = dates.length - 1; while (i >= 0 && dates[i] > COVID_END) i--; return i; })();
+    const covidWindowLen = (covidStartIdx >= 0 && covidEndIdx >= covidStartIdx) ? covidEndIdx - covidStartIdx + 1 : 0;
+    if (covidWindowLen <= 0) return out;
+
+    for (let i = 0; i < ships.length; i++) {
+      const qualifying = new Set<number>();
+      let runStart = -1;
+      const flush = (runEnd: number) => {
+        if (runStart < 0) return;
+        const len = runEnd - runStart + 1;
+        const anchored =
+          (runStart - covidStartIdx) <= 7 ||
+          (covidEndIdx - runEnd)     <= 7;
+        if (len >= 10 && anchored) {
+          for (let k = runStart; k <= runEnd; k++) qualifying.add(k);
+        }
+        runStart = -1;
+      };
+      for (let d = covidStartIdx; d <= covidEndIdx; d++) {
+        const cell = voyage.cells[i][d];
+        if (cell && cell.v >= 1) {
+          if (runStart < 0) runStart = d;
+        } else {
+          flush(d - 1);
+        }
+      }
+      flush(covidEndIdx);
+
+      const excluded = new Set<number>();
+      const ship = ships[i];
+      for (let d = covidStartIdx; d <= covidEndIdx; d++) {
+        if (isOutOfService(ship, dates[d])) continue;
+        const cell = voyage.cells[i][d];
+        const hasVisible = cell && cell.v >= 1;
+        if (!hasVisible && !qualifying.has(d)) excluded.add(d);
+      }
+      if (excluded.size > 0) out.set(i, excluded);
+    }
+    return out;
+  }, [isSilver, ships, dates, voyage]);
 
   // Filtered + sorted ship index list
   const baseShipIdx = useMemo(() => {
@@ -582,6 +640,10 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           const style = cell ? voyageCellStyle(cell) : null;
           ctx.fillStyle = style ? style.fill : C_MISSING;
           ctx.fillRect(cx, y, cw, ch);
+          if (covidExcludedByShip.get(shipIdx)?.has(di)) {
+            ctx.fillStyle = C_COVID_EXCLUDED;
+            ctx.fillRect(cx, y, cw, ch);
+          }
         } else if (mode === "silver") {
           const cell = silver.cells[shipIdx][di];
           ctx.fillStyle = cell ? (silverCellColor(cell) ?? C_MISSING) : C_MISSING;
@@ -614,6 +676,10 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           const scol = sc ? silverCellColor(sc) : null;
           if (!vcol && !scol) { ctx.fillStyle = C_MISSING; ctx.fillRect(cx, y, cw, ch); }
           else drawDiagonalCell(ctx, cx, y, cw, ch, vcol, scol);
+          if (covidExcludedByShip.get(shipIdx)?.has(di)) {
+            ctx.fillStyle = C_COVID_EXCLUDED;
+            ctx.fillRect(cx, y, cw, ch);
+          }
         }
       }
     }
@@ -1188,8 +1254,9 @@ function Legend({ mode }: { mode: ShellMode }) {
           { color: C_NEED_PROC, label: "Need process" },
           { color: C_MISSING,   label: "No voyage", border: true },
           oosEntry,
+          { color: C_COVID_EXCLUDED, label: "COVID excluded" },
         ]
-      : [{ color: C_VISIBLE, label: "Voyage visible" }, { color: C_SILVER_OK, label: "Silver clean" }, { color: C_SILVER_NR, label: "Silver review" }, { color: C_MISSING, label: "No data", border: true }, oosEntry];
+      : [{ color: C_VISIBLE, label: "Voyage visible" }, { color: C_SILVER_OK, label: "Silver clean" }, { color: C_SILVER_NR, label: "Silver review" }, { color: C_MISSING, label: "No data", border: true }, oosEntry, { color: C_COVID_EXCLUDED, label: "COVID excluded" }];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       {entries.map(e => {
