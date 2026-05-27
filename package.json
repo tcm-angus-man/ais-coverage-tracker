@@ -14,7 +14,11 @@
     "sheets:dump": "tsx scripts/sheets-dump.ts",
     "tier:coverage": "node --env-file=.env.local node_modules/.bin/tsx scripts/tier-print-coverage.ts",
     "sheet:fill-shared-mmsi": "node --env-file=.env.local node_modules/.bin/tsx scripts/fill-shared-mmsi.ts",
-    "sheet:prune-shared-mmsi": "node --env-file=.env.local node_modules/.bin/tsx scripts/prune-shared-mmsi.ts"
+    "sheet:rekey-metadata": "node --env-file=.env.local node_modules/.bin/tsx scripts/rekey-metadata-by-vessel.ts",
+    "sheet:prune-shared-mmsi": "node --env-file=.env.local node_modules/.bin/tsx scripts/prune-shared-mmsi.ts",
+    "gap:cruises": "node --env-file=.env.local node_modules/.bin/tsx scripts/gap-cruises.ts",
+    "check:display-name-drift": "node --env-file=.env.local node_modules/.bin/tsx scripts/check-display-name-drift.ts",
+    "sheet:sync-metadata": "node --env-file=.env.local node_modules/.bin/tsx scripts/sync-ship-metadata.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",

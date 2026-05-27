@@ -487,32 +487,27 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     return idxs;
   }, [ships, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeShipIds, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver, shipCoverage]);
 
-  // Vessel groups for KPI accounting. The heatmap renders one row per ship_id,
-  // but the coverage % must count each physical vessel once:
-  //   - voyage: group by imo_number (survives MMSI changes and ship renames).
-  //   - silver: group by mmsi (cleanliness is processed per MMSI).
-  // A ship with a blank/zero key falls back to its own ship_id so it's never
-  // merged with another vessel. Within a group, each calendar day is counted
-  // once using the best (most-covered) cell across the group's rows.
-  const vesselGroups = useMemo(() => {
-    const groups = new Map<string, number[]>(); // group key → ship row indices
+  // Cleanliness groups by MMSI so a shared-MMSI hull isn't double-counted in
+  // the % (silver cells fan out identically to every ship_id sharing an MMSI).
+  // The voyage tab does NOT group — each ship_id row counts independently and
+  // non-overlapping service windows keep shared-hull days from overlapping.
+  const silverGroups = useMemo(() => {
+    if (!isSilver) return [];
+    const groups = new Map<string, number[]>(); // mmsi (or ship_id fallback) → row indices
     for (const si of baseShipIdx) {
       const ship = ships[si];
-      const rawKey = isSilver ? ship.mmsi : Number(ship.imo_number);
-      const key = rawKey && rawKey > 0
-        ? (isSilver ? `m:${rawKey}` : `i:${rawKey}`)
-        : `s:${ship.id}`;
+      const key = ship.mmsi && ship.mmsi > 0 ? `m:${ship.mmsi}` : `s:${ship.id}`;
       const arr = groups.get(key);
       if (arr) arr.push(si); else groups.set(key, [si]);
     }
     return [...groups.values()];
   }, [baseShipIdx, ships, isSilver]);
 
-  // KPIs — filter-aware, counted per vessel group (not per ship_id row).
+  // KPIs — filter-aware. Silver counts per MMSI group; voyage per ship_id row.
   const kpis = useMemo(() => {
     if (isSilver) {
       let withData = 0, needsReview = 0, missing = 0;
-      for (const group of vesselGroups) {
+      for (const group of silverGroups) {
         for (let di = silverDateOffset; di < dates.length; di++) {
           const date = dates[di];
           // Merge the group's rows for this day: pick the cell with the most
@@ -540,32 +535,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const covidEndIdx   = (() => { let i = dates.length - 1; while (i >= 0 && dates[i] > COVID_END) i--; return i; })();
       const covidWindowLen = (covidStartIdx >= 0 && covidEndIdx >= covidStartIdx) ? covidEndIdx - covidStartIdx + 1 : 0;
 
-      // Merge a vessel group's rows into one cell-per-day array. For each day
-      // pick the most-covered cell (highest v, tie-broken by t) among rows
-      // that are in service. A day is OOS for the vessel only when *every*
-      // row in the group is OOS that day. Returns { cell, oos } per index.
-      function mergeGroup(group: number[]): { cell: Cell | null; oos: boolean }[] {
-        const merged: { cell: Cell | null; oos: boolean }[] = new Array(dates.length);
-        for (let d = 0; d < dates.length; d++) {
-          const date = dates[d];
-          let best: Cell | null = null;
-          let anyInService = false;
-          for (const si of group) {
-            if (isOutOfService(ships[si], date)) continue;
-            anyInService = true;
-            const cell = voyage.cells[si][d];
-            if (cell && (best === null || cell.v > best.v || (cell.v === best.v && cell.t > best.t))) {
-              best = cell;
-            }
-          }
-          merged[d] = { cell: best, oos: !anyInService };
-        }
-        return merged;
-      }
-
-      // Qualifying COVID run days for a merged group row (≥10 consecutive
-      // v>=1 days anchored within 7 days of either COVID boundary).
-      function qualifyingCovidIndices(merged: { cell: Cell | null }[]): Set<number> {
+      // Per-ship_id COVID qualifying-run days (≥10 consecutive v>=1 days
+      // anchored within 7 days of either COVID boundary).
+      const qualifyingCovidIndices = (si: number): Set<number> => {
         const qualifying = new Set<number>();
         if (covidWindowLen <= 0) return qualifying;
         let runStart = -1;
@@ -581,7 +553,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           runStart = -1;
         };
         for (let d = covidStartIdx; d <= covidEndIdx; d++) {
-          const cell = merged[d].cell;
+          const cell = voyage.cells[si][d];
           if (cell && cell.v >= 1) {
             if (runStart < 0) runStart = d;
           } else {
@@ -590,17 +562,19 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         }
         flush(covidEndIdx);
         return qualifying;
-      }
+      };
 
+      // Voyage counts per ship_id row independently — non-overlapping service
+      // windows (e.g. BRAEMAR 2001–2024 vs VILLA VIE 2024–) keep a shared
+      // hull's days from being counted on more than one row.
       let withData = 0, requested = 0, needsReview = 0, missing = 0, covidExcluded = 0, oosExcluded = 0;
-      for (const group of vesselGroups) {
-        const merged = mergeGroup(group);
-        const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(merged) : null;
+      for (const si of baseShipIdx) {
+        const ship = ships[si];
+        const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(si) : null;
         for (let d = 0; d < dates.length; d++) {
-          // Skip days where the whole vessel is out of service — a hull
-          // retired in 2020 shouldn't drag down the 2015–today denominator.
-          if (merged[d].oos) { oosExcluded++; continue; }
-          const cell = merged[d].cell;
+          // Skip days outside the ship's [service_start, service_end] window.
+          if (isOutOfService(ship, dates[d])) { oosExcluded++; continue; }
+          const cell = voyage.cells[si][d];
           const hasVoyage = cell && cell.t > 0;
           const hasVisible = cell && cell.v >= 1;
           // Check if this day falls in COVID window and is not a qualifying run day
@@ -617,7 +591,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
       return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
     }
-  }, [isSilver, baseShipIdx, vesselGroups, silverDateOffset, dates, silver, voyage, silverDates, ships]);
+  }, [isSilver, baseShipIdx, silverGroups, silverDateOffset, dates, silver, voyage, silverDates, ships]);
 
   const rowCount = baseShipIdx.length;
   const colCount = activeDates.length;

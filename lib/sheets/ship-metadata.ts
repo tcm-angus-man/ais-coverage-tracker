@@ -4,6 +4,7 @@ import { sheetsGet } from "./client";
 import { SHIP_METADATA_COLUMNS } from "./schemas";
 
 export type ShipMetadata = {
+  ship_name: string;            // raw sheet ship_name; pairs with mmsi to disambiguate shared-MMSI hulls
   mmsi: number;
   cruise_type: string;
   service_start: string | null; // YYYY-MM-DD or null
@@ -11,6 +12,16 @@ export type ShipMetadata = {
   tier: 1 | 2 | 3 | 4;
   imo_number: string | null;    // durable vessel id; null when sheet cell blank
 };
+
+// Normalised (mmsi, ship_name) composite key. Two vessels can share an MMSI
+// (resold/renamed hull keeps its AIS unit) but never the same name+mmsi pair,
+// so this is the reliable per-vessel key for matching a Postgres ship to its
+// sheet row. Name is lower-cased and whitespace-collapsed so trivial
+// formatting differences don't break the match.
+export function vesselKey(mmsi: number, shipName: string): string {
+  const name = shipName.toLowerCase().replace(/\s+/g, " ").trim();
+  return `${mmsi}|${name}`;
+}
 
 // Widened to H to include the optional imo_number column. The loader tolerates
 // the column being absent (rows simply omit it) so the snapshot still builds
@@ -22,6 +33,7 @@ const SHEET_RANGE = "ship_metadata!A1:H";
 const REQUIRED_COLS = 7;
 
 function parseRow(row: string[], rowIndex: number): ShipMetadata | null {
+  const ship_name = (row[0] ?? "").trim();
   const mmsiRaw = (row[2] ?? "").trim();
   if (!mmsiRaw) return null;
   const mmsi = Number(mmsiRaw);
@@ -40,6 +52,7 @@ function parseRow(row: string[], rowIndex: number): ShipMetadata | null {
   }
 
   return {
+    ship_name,
     mmsi,
     cruise_type,
     service_start: service_start_raw || null,
@@ -66,13 +79,19 @@ async function fetchShipMetadataRaw(): Promise<ShipMetadata[]> {
     throw new Error(`ship_metadata header mismatch col 7: got ${JSON.stringify(header[7])}, want "imo_number" (or empty)`);
   }
 
+  // Dedupe by the (mmsi, ship_name) composite. Two vessels can share an MMSI
+  // (a resold/renamed hull keeps its AIS unit) but never the same name+mmsi,
+  // so this keeps BOTH vessels' rows — the old MMSI-only dedupe silently
+  // dropped the second vessel, which is why a shared-MMSI ship inherited the
+  // other vessel's service window.
   const out: ShipMetadata[] = [];
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   for (let i = 1; i < rows.length; i++) {
     const parsed = parseRow(rows[i], i);
     if (!parsed) continue;
-    if (seen.has(parsed.mmsi)) continue;
-    seen.add(parsed.mmsi);
+    const key = vesselKey(parsed.mmsi, parsed.ship_name);
+    if (seen.has(key)) continue;
+    seen.add(key);
     out.push(parsed);
   }
   return out;
@@ -87,6 +106,17 @@ export const fetchShipMetadata = unstable_cache(
 // Bypasses the cache. Use from debug endpoints and the snapshot cron where
 // we want the current sheet state without a 5-minute lag.
 export const fetchShipMetadataUncached = fetchShipMetadataRaw;
+
+// Primary index for the per-vessel window lookup: (mmsi, ship_name). This is
+// what reliably disambiguates two hulls sharing an MMSI. See vesselKey.
+export function indexByVessel(rows: ShipMetadata[]): Map<string, ShipMetadata> {
+  const m = new Map<string, ShipMetadata>();
+  for (const r of rows) {
+    const k = vesselKey(r.mmsi, r.ship_name);
+    if (!m.has(k)) m.set(k, r);
+  }
+  return m;
+}
 
 export function indexByMmsi(rows: ShipMetadata[]): Map<number, ShipMetadata> {
   const m = new Map<number, ShipMetadata>();

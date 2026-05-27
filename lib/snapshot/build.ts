@@ -9,7 +9,7 @@ import {
 import { VOYAGE_START } from "./types";
 import { compressJson } from "./compress";
 import { putCoverageBlob, type BlobPutResult } from "./blob";
-import { fetchShipMetadataUncached, indexByMmsi, indexByImo, type ShipMetadata } from "@/lib/sheets/ship-metadata";
+import { fetchShipMetadataUncached, indexByVessel, indexByMmsi, indexByImo, vesselKey, type ShipMetadata } from "@/lib/sheets/ship-metadata";
 
 export type BuildResult = {
   generated_at: string;
@@ -43,15 +43,17 @@ export async function buildSnapshot(): Promise<BuildResult> {
     fetchShipMetadataSafe(),
   ]);
   const dates = buildDateAxis();
+  const metadataByVessel = indexByVessel(metadata);
   const metadataByMmsi = indexByMmsi(metadata);
   const metadataByImo = indexByImo(metadata);
 
-  // Service window + tier come from the ship_metadata sheet. Look up by the
-  // ship's imo_number first (durable vessel id — survives MMSI changes), then
-  // fall back to mmsi for sheet rows that don't yet carry an imo_number.
-  // A ship whose MMSI changed but whose IMO is in the sheet now resolves
-  // correctly, fixing the "0% / missing service window" case.
+  // Service window + tier come from the ship_metadata sheet. Resolve each ship
+  // to its sheet row by (mmsi, display_name) first — this disambiguates two
+  // hulls sharing an MMSI (e.g. VILLA VIE ODYSSEY vs BRAEMAR), which an
+  // MMSI-only lookup conflated, handing one vessel the other's window. Fall
+  // back to imo_number, then bare mmsi, for rows where the name didn't match.
   const metaForShip = (s: (typeof ships)[number]): ShipMetadata | undefined =>
+    metadataByVessel.get(vesselKey(s.mmsi, s.display_name)) ??
     (s.imo_number ? metadataByImo.get(s.imo_number) : undefined) ??
     metadataByMmsi.get(s.mmsi);
 
