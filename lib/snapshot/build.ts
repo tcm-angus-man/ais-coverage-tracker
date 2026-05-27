@@ -9,7 +9,7 @@ import {
 import { VOYAGE_START } from "./types";
 import { compressJson } from "./compress";
 import { putCoverageBlob, type BlobPutResult } from "./blob";
-import { fetchShipMetadataUncached, indexByMmsi, type ShipMetadata } from "@/lib/sheets/ship-metadata";
+import { fetchShipMetadataUncached, indexByMmsi, indexByImo, type ShipMetadata } from "@/lib/sheets/ship-metadata";
 
 export type BuildResult = {
   generated_at: string;
@@ -44,6 +44,16 @@ export async function buildSnapshot(): Promise<BuildResult> {
   ]);
   const dates = buildDateAxis();
   const metadataByMmsi = indexByMmsi(metadata);
+  const metadataByImo = indexByImo(metadata);
+
+  // Service window + tier come from the ship_metadata sheet. Look up by the
+  // ship's imo_number first (durable vessel id — survives MMSI changes), then
+  // fall back to mmsi for sheet rows that don't yet carry an imo_number.
+  // A ship whose MMSI changed but whose IMO is in the sheet now resolves
+  // correctly, fixing the "0% / missing service window" case.
+  const metaForShip = (s: (typeof ships)[number]): ShipMetadata | undefined =>
+    (s.imo_number ? metadataByImo.get(s.imo_number) : undefined) ??
+    metadataByMmsi.get(s.mmsi);
 
   // Voyage cells are keyed by ship_id (voyages processed per ship).
   const voyage_cells: Record<string, Record<string, Cell>> = {};
@@ -99,7 +109,7 @@ export async function buildSnapshot(): Promise<BuildResult> {
     generated_at,
     date_range: { start: VOYAGE_START, end: dates[dates.length - 1] },
     ships: ships.map((s) => {
-      const meta = metadataByMmsi.get(s.mmsi);
+      const meta = metaForShip(s);
       return {
         id: s.id,
         mmsi: s.mmsi,

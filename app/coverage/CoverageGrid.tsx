@@ -531,7 +531,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const cleanDays = withData - needsReview;
       const totalDays = withData + missing;
       const pct = totalDays === 0 ? 0 : Math.round((cleanDays / totalDays) * 1000) / 10;
-      return { ships: vesselGroups.length, dates: silverDates.length, pct, label: "cleaned", withData, needsReview, missing };
+      return { ships: baseShipIdx.length, dates: silverDates.length, pct, label: "cleaned", withData, needsReview, missing };
     } else {
       // COVID window: days in this range with no legit coverage are excluded from denominator
       const COVID_START = "2020-03-01";
@@ -615,9 +615,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const total = withData + missing;
       const pct        = total     === 0 ? 0 : Math.round((withData / total)     * 1000) / 10;
       const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
-      return { ships: vesselGroups.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
+      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
     }
-  }, [isSilver, vesselGroups, silverDateOffset, dates, silver, voyage, silverDates, ships]);
+  }, [isSilver, baseShipIdx, vesselGroups, silverDateOffset, dates, silver, voyage, silverDates, ships]);
 
   const rowCount = baseShipIdx.length;
   const colCount = activeDates.length;

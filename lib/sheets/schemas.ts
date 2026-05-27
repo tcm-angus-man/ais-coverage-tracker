@@ -32,10 +32,12 @@ export const AUDIT_LOG_COLUMNS = [
 ] as const;
 
 // Ship-level reference data: tier classification + in-service window.
-// MMSI-keyed so a ship that re-flags (new MMSI + possibly new name/operator)
-// can be managed as a distinct row from its previous identity.
-// Dates are YYYY-MM-DD; blank service_start = active before voyage window;
-// blank service_end = still in service.
+// imo_number is the durable vessel identity (survives MMSI changes/reflags)
+// and is the primary key for the voyage tab's service-window lookup; mmsi is
+// retained for the cleanliness tab and as a fallback when imo_number is blank.
+// imo_number is appended at the end (column H) so existing row positions are
+// preserved. Dates are YYYY-MM-DD; blank service_start = active before voyage
+// window; blank service_end = still in service.
 export const SHIP_METADATA_COLUMNS = [
   "ship_name",
   "cruise_line",
@@ -44,4 +46,5 @@ export const SHIP_METADATA_COLUMNS = [
   "service_start",
   "service_end",
   "tier",
+  "imo_number",
 ] as const;
