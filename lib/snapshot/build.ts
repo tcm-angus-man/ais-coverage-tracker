@@ -45,36 +45,10 @@ export async function buildSnapshot(): Promise<BuildResult> {
   const dates = buildDateAxis();
   const metadataByMmsi = indexByMmsi(metadata);
 
-  // Voyage and silver cells both live MMSI-keyed in the SQL result (SQL
-  // aggregation by ship_id was too slow). We fan each row out to every
-  // ship_id sharing the MMSI, attributed by service window so a renamed
-  // hull's old name doesn't show voyages from its new name's era.
-  const shipsByMmsi = new Map<number, typeof ships>();
-  for (const s of ships) {
-    const arr = shipsByMmsi.get(s.mmsi) ?? [];
-    arr.push(s);
-    shipsByMmsi.set(s.mmsi, arr);
-  }
-
-  // Per-ship service window comes from the ship_metadata sheet, indexed by
-  // MMSI. Today the window is shared across ships sharing an MMSI (sheet is
-  // MMSI-keyed), so this filter doesn't yet split shared-MMSI hulls — that
-  // requires either an imo_number-keyed sheet or per-ship-id windows. We
-  // still apply the filter so the structure is in place when those land.
-  function dateInWindow(s: (typeof ships)[number], date: string): boolean {
-    const meta = metadataByMmsi.get(s.mmsi);
-    const start = meta?.service_start ?? null;
-    const end = meta?.service_end ?? null;
-    if (start && date < start) return false;
-    if (end && date > end) return false;
-    return true;
-  }
-
+  // Voyage cells are keyed by ship_id (voyages processed per ship).
   const voyage_cells: Record<string, Record<string, Cell>> = {};
   for (const r of voyageRows) {
-    const shipsForMmsi = shipsByMmsi.get(r.mmsi);
-    if (!shipsForMmsi || shipsForMmsi.length === 0) continue;
-    const cell: Cell = {
+    (voyage_cells[String(r.ship_id)] ??= {})[r.date] = {
       t: r.t,
       v: r.v,
       na: r.na,
@@ -85,10 +59,17 @@ export async function buildSnapshot(): Promise<BuildResult> {
       sp: 0,
       ol: 0,
     };
-    for (const s of shipsForMmsi) {
-      if (!dateInWindow(s, r.date)) continue;
-      (voyage_cells[String(s.id)] ??= {})[r.date] = cell;
-    }
+  }
+
+  // Silver cells stay keyed by MMSI — cleanliness is processed per MMSI, so
+  // ships sharing an MMSI legitimately share silver data. We fan each MMSI
+  // row out to every ship_id sharing it so the renderer (which indexes cells
+  // by ship_id) finds them.
+  const shipsByMmsi = new Map<number, typeof ships>();
+  for (const s of ships) {
+    const arr = shipsByMmsi.get(s.mmsi) ?? [];
+    arr.push(s);
+    shipsByMmsi.set(s.mmsi, arr);
   }
 
   const silver_cells: Record<string, Record<string, Cell>> = {};
@@ -109,7 +90,6 @@ export async function buildSnapshot(): Promise<BuildResult> {
       ...(r.updated_by != null ? { updated_by: r.updated_by } : {}),
     };
     for (const s of shipsForMmsi) {
-      if (!dateInWindow(s, r.date)) continue;
       (silver_cells[String(s.id)] ??= {})[r.date] = cell;
     }
   }
