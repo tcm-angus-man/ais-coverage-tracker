@@ -323,10 +323,11 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const out = new Map<number, number>();
     if (isSilver) {
       for (let i = 0; i < ships.length; i++) {
-        const ship = ships[i];
         let clean = 0, total = 0;
         for (let d = silverDateOffset; d < dates.length; d++) {
-          if (isOutOfService(ship, dates[d])) continue;
+          // Silver/cleanliness is MMSI-keyed; ship names (and thus the
+          // sheet-resolved service window) are unreliable here, so we don't
+          // exclude out-of-service days — every cleaned ship-day counts.
           const cell = silver.cells[i][d];
           total++;
           if (cell && cell.t > 0 && (cell.dt + cell.dd + cell.sp + cell.ol) === 0) clean++;
@@ -509,12 +510,12 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       let withData = 0, needsReview = 0, missing = 0;
       for (const group of silverGroups) {
         for (let di = silverDateOffset; di < dates.length; di++) {
-          const date = dates[di];
           // Merge the group's rows for this day: pick the cell with the most
-          // pings (t), treating out-of-service rows as absent.
+          // pings (t). Silver/cleanliness is MMSI-keyed and ship names (and so
+          // the service window) are unreliable here, so we don't drop
+          // out-of-service rows — every cleaned ship-day counts.
           let best: Cell | null = null;
           for (const si of group) {
-            if (isOutOfService(ships[si], date)) continue;
             const cell = silver.cells[si][di];
             if (cell && (best === null || cell.t > best.t)) best = cell;
           }
@@ -669,9 +670,11 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         const cw = CELL_W - 1, ch = CELL_H - 1;
         const cellDate = dates[di];
 
-        // Out-of-service days short-circuit all mode-specific rendering.
-        // Distinct from C_MISSING (no data) and from gap days (np=1).
-        if (cellDate && isOutOfService(ship, cellDate)) {
+        // Out-of-service days short-circuit mode-specific rendering — but only
+        // in voyage/combined. Silver/cleanliness is MMSI-keyed with unreliable
+        // ship names, so it ignores the service window and renders every
+        // cleaned ship-day. Distinct from C_MISSING (no data) and gap days (np=1).
+        if (mode !== "silver" && cellDate && isOutOfService(ship, cellDate)) {
           drawOutOfServiceCell(ctx, cx, y, cw, ch);
           continue;
         }
@@ -1349,7 +1352,7 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
         )}
         <div style={{ fontSize: 10, color: C_INK_DIM, marginTop: 2 }}>{date}</div>
       </div>
-      {isOutOfService(ship, date) ? (
+      {mode !== "silver" && isOutOfService(ship, date) ? (
         <div style={{ color: C_INK_FAINT, fontStyle: "italic" }}>out of service on this date</div>
       ) : (
         <>
