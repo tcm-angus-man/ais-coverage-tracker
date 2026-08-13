@@ -18,7 +18,10 @@
     "sheet:prune-shared-mmsi": "node --env-file=.env.local node_modules/.bin/tsx scripts/prune-shared-mmsi.ts",
     "gap:cruises": "node --env-file=.env.local node_modules/.bin/tsx scripts/gap-cruises.ts",
     "check:display-name-drift": "node --env-file=.env.local node_modules/.bin/tsx scripts/check-display-name-drift.ts",
-    "sheet:sync-metadata": "node --env-file=.env.local node_modules/.bin/tsx scripts/sync-ship-metadata.ts"
+    "sheet:sync-metadata": "node --env-file=.env.local node_modules/.bin/tsx scripts/sync-ship-metadata.ts",
+    "probe:metadata-identity": "node --env-file=.env.local node_modules/.bin/tsx scripts/probe-metadata-identity.ts",
+    "sheet:fix-names": "node --env-file=.env.local node_modules/.bin/tsx scripts/fix-metadata-names.ts",
+    "sheet:append-missing": "node --env-file=.env.local node_modules/.bin/tsx scripts/append-missing-ships.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",
