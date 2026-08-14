@@ -16,6 +16,7 @@ import {
   buildRows,
   mergeSilverCells,
   mergeVoyageCells,
+  rowInService,
   rowIsOutOfService,
   shipIsOutOfService,
   type Row,
@@ -482,16 +483,23 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
 
   // Filtered + sorted ship index list
   const baseShipIdx = useMemo(() => {
+    // A row is one hull with possibly several ship records. Match on ANY member
+    // so a row never vanishes because the current identity alone failed the
+    // predicate — searching a retired name must still find the hull.
     let idxs = rows.map((_, i) => i).filter(i => {
-      const s = rows[i].primary;
+      const row = rows[i];
       if (isSilver && !silverRowSet.has(i)) return false;
-      if (inServiceOnly && !s.in_service) return false;
-      if (selectedTiers.size > 0 && !selectedTiers.has(s.tier)) return false;
-      if (selectedLines.size > 0 && !selectedLines.has(s.cruise_line)) return false;
-      if (filteredAssigneeShipIds && !filteredAssigneeShipIds.has(s.id)) return false;
+      if (inServiceOnly && !rowInService(row)) return false;
+      if (selectedTiers.size > 0 && !row.members.some(s => selectedTiers.has(s.tier))) return false;
+      if (selectedLines.size > 0 && !row.members.some(s => selectedLines.has(s.cruise_line))) return false;
+      if (filteredAssigneeShipIds && !row.members.some(s => filteredAssigneeShipIds.has(s.id))) return false;
       if (filter.trim()) {
         const q = filter.toLowerCase();
-        return s.display_name.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.cruise_line.toLowerCase().includes(q) || String(s.mmsi).includes(q);
+        if (String(row.mmsi).includes(q)) return true;
+        return row.members.some(s =>
+          s.display_name.toLowerCase().includes(q) ||
+          s.name.toLowerCase().includes(q) ||
+          s.cruise_line.toLowerCase().includes(q));
       }
       return true;
     });
@@ -811,10 +819,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     for (let r = firstRow; r <= lastRow; r++) {
       const shipIdx = baseShipIdx[r];
       const ship = rows[shipIdx].primary;
+      // Grey the row only when NO member is in service — a hull whose current
+      // identity sails is active even if its retired record is not.
+      const inService = rowInService(rows[shipIdx]);
       const yTop = HEADER_H + r * CELL_H - sy;
       const yMid = yTop + CELL_H / 2;
       if (r % 2 === 0) { ctx.fillStyle = C_PANEL; ctx.fillRect(0, yTop, HEADER_W, CELL_H); }
-      ctx.fillStyle = ship.in_service ? C_INK : C_INK_FAINT;
+      ctx.fillStyle = inService ? C_INK : C_INK_FAINT;
       ctx.textAlign = "left";
       ctx.fillText(ship.display_name.slice(0, nameMaxChars), 10, yMid);
 
@@ -831,7 +842,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       ctx.lineWidth = 1;
       ctx.strokeRect(barX + 0.5, barY + 0.5, BAR_W - 1, BAR_H - 1);
 
-      ctx.fillStyle = ship.in_service ? C_INK_DIM : C_INK_FAINT;
+      ctx.fillStyle = inService ? C_INK_DIM : C_INK_FAINT;
       ctx.textAlign = "right";
       ctx.font = "10px 'JetBrains Mono', ui-monospace, monospace";
       ctx.fillText(`${Math.round(pct)}%`, pctX, yMid);
