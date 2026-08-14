@@ -12,6 +12,12 @@ import { useSession } from "next-auth/react";
 import type { Cell, CoveragePayload, Ship } from "./types";
 import type { ShellMode } from "./CoverageShell";
 import { useAssignments } from "./AssignmentContext";
+import {
+  buildRows,
+  mergeSilverCells,
+  mergeVoyageCells,
+  type Row,
+} from "./rows";
 
 // Cleaners who work live-data — highlighted in the assignee picker
 const LIVE_DATA_TEAM = new Set(["nick", "ai-ai", "kim"]);
@@ -104,13 +110,14 @@ type LayerMeta = { cells: (Cell | null)[][] };
 
 type Indexed = {
   payload: CoveragePayload;
-  ships: Ship[];
+  rows: Row[];
   dates: string[];
   silverDates: string[];
   silverDateOffset: number;
   voyage: LayerMeta;
   silver: LayerMeta;
-  silverShipSet: Set<number>;
+  /** Row indices that have silver data on at least one member. */
+  silverRowSet: Set<number>;
   cruiseLineList: string[];
 };
 
@@ -119,15 +126,45 @@ function indexPayload(payload: CoveragePayload): Indexed {
   const dateIdx = new Map<string, number>();
   for (let i = 0; i < dates.length; i++) dateIdx.set(dates[i], i);
 
-  // silverShipSet keyed by ship.id — cells are now ship_id-keyed, not mmsi.
-  const silverShipSet = new Set<number>(Object.keys(payload.silver_cells).map(Number));
+  // One row per MMSI. The payload stays ship_id-keyed so per-day attribution
+  // survives; merging happens here.
+  const rows = buildRows(ships, payload.voyage_cells);
 
-  const buildLayer = (layer: Record<string, Record<string, Cell>>): LayerMeta => {
+  const silverShipIds = new Set<number>(Object.keys(payload.silver_cells).map(Number));
+  const silverRowSet = new Set<number>();
+  rows.forEach((row, i) => {
+    if (row.members.some(s => silverShipIds.has(s.id))) silverRowSet.add(i);
+  });
+
+  const buildLayer = (
+    layer: Record<string, Record<string, Cell>>,
+    merge: (cells: (Cell | null)[]) => Cell | null,
+  ): LayerMeta => {
     const cells: (Cell | null)[][] = [];
-    for (const s of ships) {
-      const row = layer[String(s.id)];
+    for (const row of rows) {
       const arr: (Cell | null)[] = new Array(dates.length).fill(null);
-      if (row) for (const d in row) { const i = dateIdx.get(d); if (i !== undefined) arr[i] = row[d]; }
+      const memberRows = row.members
+        .map(s => layer[String(s.id)])
+        .filter((r): r is Record<string, Cell> => Boolean(r));
+      if (memberRows.length === 1) {
+        // Single member — no merge cost on the overwhelmingly common path.
+        for (const d in memberRows[0]) {
+          const i = dateIdx.get(d);
+          if (i !== undefined) arr[i] = memberRows[0][d];
+        }
+      } else if (memberRows.length > 1) {
+        const touched = new Set<number>();
+        for (const m of memberRows) {
+          for (const d in m) {
+            const i = dateIdx.get(d);
+            if (i !== undefined) touched.add(i);
+          }
+        }
+        for (const i of touched) {
+          const d = dates[i];
+          arr[i] = merge(memberRows.map(m => m[d] ?? null));
+        }
+      }
       cells.push(arr);
     }
     return { cells };
@@ -141,7 +178,17 @@ function indexPayload(payload: CoveragePayload): Indexed {
   for (const s of ships) if (s.cruise_line) clSet.add(s.cruise_line);
   const cruiseLineList = Array.from(clSet).sort();
 
-  return { payload, ships, dates, silverDates, silverDateOffset, voyage: buildLayer(payload.voyage_cells), silver: buildLayer(payload.silver_cells), silverShipSet, cruiseLineList };
+  return {
+    payload,
+    rows,
+    dates,
+    silverDates,
+    silverDateOffset,
+    voyage: buildLayer(payload.voyage_cells, mergeVoyageCells),
+    silver: buildLayer(payload.silver_cells, mergeSilverCells),
+    silverRowSet,
+    cruiseLineList,
+  };
 }
 
 // ---------- diagonal split ----------
@@ -218,7 +265,7 @@ const DENSITY_OPTIONS: { k: Density; label: string }[] = [
 // ---------- component ----------
 export default function CoverageGrid({ payload, mode }: { payload: CoveragePayload; mode: ShellMode }) {
   const indexed = useMemo(() => indexPayload(payload), [payload]);
-  const { ships, dates, silverDates, silverDateOffset, voyage, silver, silverShipSet, cruiseLineList } = indexed;
+  const { rows, dates, silverDates, silverDateOffset, voyage, silver, silverRowSet, cruiseLineList } = indexed;
   const { addDraft, drafts: assignments, reload: reloadAssignments } = useAssignments();
   const { data: session } = useSession();
   const isAssigner = session?.user?.role === "assigner";
@@ -255,11 +302,11 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   // backfill ship_id manually.
   const shipIdByMmsi = useMemo(() => {
     const m = new Map<number, number>();
-    for (const s of ships) {
+    for (const s of payload.ships) {
       if (!m.has(s.mmsi)) m.set(s.mmsi, s.id);
     }
     return m;
-  }, [ships]);
+  }, [payload]);
 
   // Map "ship_id|YYYY-MM-DD" → { assignee, status } for every ship-day
   // covered by an active (non-done) assignment. Clamp iteration to the
@@ -322,7 +369,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const shipCoverage = useMemo(() => {
     const out = new Map<number, number>();
     if (isSilver) {
-      for (let i = 0; i < ships.length; i++) {
+      for (let i = 0; i < rows.length; i++) {
         let clean = 0, total = 0;
         for (let d = silverDateOffset; d < dates.length; d++) {
           // Silver/cleanliness is MMSI-keyed; ship names (and thus the
@@ -368,8 +415,8 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         return qualifying;
       };
 
-      for (let i = 0; i < ships.length; i++) {
-        const ship = ships[i];
+      for (let i = 0; i < rows.length; i++) {
+        const ship = rows[i].primary;
         const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(i) : null;
         let visible = 0, total = 0;
         for (let d = 0; d < dates.length; d++) {
@@ -386,7 +433,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       }
     }
     return out;
-  }, [isSilver, ships, dates, silverDateOffset, voyage, silver]);
+  }, [isSilver, rows, dates, silverDateOffset, voyage, silver]);
 
   // Per-ship set of date indices excluded by the COVID adjustment, used to
   // tint those cells on the canvas. A day is excluded when it falls in the
@@ -403,7 +450,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const covidWindowLen = (covidStartIdx >= 0 && covidEndIdx >= covidStartIdx) ? covidEndIdx - covidStartIdx + 1 : 0;
     if (covidWindowLen <= 0) return out;
 
-    for (let i = 0; i < ships.length; i++) {
+    for (let i = 0; i < rows.length; i++) {
       const qualifying = new Set<number>();
       let runStart = -1;
       const flush = (runEnd: number) => {
@@ -428,7 +475,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       flush(covidEndIdx);
 
       const excluded = new Set<number>();
-      const ship = ships[i];
+      const ship = rows[i].primary;
       for (let d = covidStartIdx; d <= covidEndIdx; d++) {
         if (isOutOfService(ship, dates[d])) continue;
         const cell = voyage.cells[i][d];
@@ -438,13 +485,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       if (excluded.size > 0) out.set(i, excluded);
     }
     return out;
-  }, [isSilver, ships, dates, voyage]);
+  }, [isSilver, rows, dates, voyage]);
 
   // Filtered + sorted ship index list
   const baseShipIdx = useMemo(() => {
-    let idxs = ships.map((_, i) => i).filter(i => {
-      const s = ships[i];
-      if (isSilver && !silverShipSet.has(s.id)) return false;
+    let idxs = rows.map((_, i) => i).filter(i => {
+      const s = rows[i].primary;
+      if (isSilver && !silverRowSet.has(i)) return false;
       if (inServiceOnly && !s.in_service) return false;
       if (selectedTiers.size > 0 && !selectedTiers.has(s.tier)) return false;
       if (selectedLines.size > 0 && !selectedLines.has(s.cruise_line)) return false;
@@ -479,14 +526,14 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         return last(b) - last(a);
       });
     } else if (sort === "imo") {
-      idxs.sort((a, b) => ships[a].imo_number.localeCompare(ships[b].imo_number, undefined, { numeric: true }));
+      idxs.sort((a, b) => rows[a].primary.imo_number.localeCompare(rows[b].primary.imo_number, undefined, { numeric: true }));
     } else if (sort === "cruise_line") {
-      idxs.sort((a, b) => ships[a].cruise_line.localeCompare(ships[b].cruise_line) || ships[a].display_name.localeCompare(ships[b].display_name));
+      idxs.sort((a, b) => rows[a].primary.cruise_line.localeCompare(rows[b].primary.cruise_line) || rows[a].primary.display_name.localeCompare(rows[b].primary.display_name));
     } else {
-      idxs.sort((a, b) => ships[a].display_name.localeCompare(ships[b].display_name));
+      idxs.sort((a, b) => rows[a].primary.display_name.localeCompare(rows[b].primary.display_name));
     }
     return idxs;
-  }, [ships, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeShipIds, sort, isSilver, silverShipSet, silverDateOffset, dates, voyage, silver, shipCoverage]);
+  }, [rows, filter, inServiceOnly, selectedLines, selectedTiers, filteredAssigneeShipIds, sort, isSilver, silverRowSet, silverDateOffset, dates, voyage, silver, shipCoverage]);
 
   // Cleanliness groups by MMSI so a shared-MMSI hull isn't double-counted in
   // the % (silver cells fan out identically to every ship_id sharing an MMSI).
@@ -496,13 +543,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     if (!isSilver) return [];
     const groups = new Map<string, number[]>(); // mmsi (or ship_id fallback) → row indices
     for (const si of baseShipIdx) {
-      const ship = ships[si];
+      const ship = rows[si].primary;
       const key = ship.mmsi && ship.mmsi > 0 ? `m:${ship.mmsi}` : `s:${ship.id}`;
       const arr = groups.get(key);
       if (arr) arr.push(si); else groups.set(key, [si]);
     }
     return [...groups.values()];
-  }, [baseShipIdx, ships, isSilver]);
+  }, [baseShipIdx, rows, isSilver]);
 
   // KPIs — filter-aware. Silver counts per MMSI group; voyage per ship_id row.
   const kpis = useMemo(() => {
@@ -570,7 +617,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       // hull's days from being counted on more than one row.
       let withData = 0, requested = 0, needsReview = 0, missing = 0, covidExcluded = 0, oosExcluded = 0;
       for (const si of baseShipIdx) {
-        const ship = ships[si];
+        const ship = rows[si].primary;
         const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(si) : null;
         for (let d = 0; d < dates.length; d++) {
           // Skip days outside the ship's [service_start, service_end] window.
@@ -592,7 +639,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
       return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
     }
-  }, [isSilver, baseShipIdx, silverGroups, silverDateOffset, dates, silver, voyage, silverDates, ships]);
+  }, [isSilver, baseShipIdx, silverGroups, silverDateOffset, dates, silver, voyage, silverDates, rows]);
 
   const rowCount = baseShipIdx.length;
   const colCount = activeDates.length;
@@ -662,7 +709,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     // Cells
     for (let r = firstRow; r <= lastRow; r++) {
       const shipIdx = baseShipIdx[r];
-      const ship = ships[shipIdx];
+      const ship = rows[shipIdx].primary;
       const y = HEADER_H + r * CELL_H - sy;
       for (let c = firstCol; c <= lastCol; c++) {
         const di = activeDateOffset + c;
@@ -699,7 +746,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
             ctx.strokeRect(cx + 0.5, y + 0.5, cw - 1, ch - 1);
           }
           // Assignment dot — top-right corner, coloured by assignee
-          const info = assignedCells.get(`${ships[shipIdx].id}|${dates[di]}`);
+          const info = assignedCells.get(`${rows[shipIdx].primary.id}|${dates[di]}`);
           const dotVisible = info && (!assigneeFilter || info.assignee === assigneeFilter);
           if (dotVisible) {
             const r = Math.max(1.5, Math.min(2.5, CELL_W / 5));
@@ -792,7 +839,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const nameMaxChars = Math.max(4, Math.floor(nameMaxPx / 7));
     for (let r = firstRow; r <= lastRow; r++) {
       const shipIdx = baseShipIdx[r];
-      const ship = ships[shipIdx];
+      const ship = rows[shipIdx].primary;
       const yTop = HEADER_H + r * CELL_H - sy;
       const yMid = yTop + CELL_H / 2;
       if (r % 2 === 0) { ctx.fillStyle = C_PANEL; ctx.fillRect(0, yTop, HEADER_W, CELL_H); }
@@ -854,7 +901,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const hit = hitTest(e);
     if (!hit) { setTooltip(null); return; }
-    const ship = ships[hit.shipIdx];
+    const ship = rows[hit.shipIdx].primary;
     const date = dates[hit.dateIdx];
     const v = payload.voyage_cells[String(ship.id)]?.[date];
     const s = payload.silver_cells[String(ship.id)]?.[date];
@@ -864,7 +911,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       setDrag(prev => prev ? { ...prev, r1: hit.r, c1: hit.c } : prev);
       setRenderTick(n => (n + 1) | 0);
     }
-  }, [hitTest, ships, dates, payload, mode, assignedCells]);
+  }, [hitTest, rows, dates, payload, mode, assignedCells]);
 
   const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDragging.current || !drag || mode !== "silver") { isDragging.current = false; return; }
@@ -872,7 +919,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     const r0 = Math.min(drag.r0, drag.r1), r1 = Math.max(drag.r0, drag.r1);
     const c0 = Math.min(drag.c0, drag.c1), c1 = Math.max(drag.c0, drag.c1);
     const shipIdx = baseShipIdx[r0];
-    const ship = ships[shipIdx];
+    const ship = rows[shipIdx].primary;
     const dateStart = activeDates[c0];
     const dateEnd   = activeDates[c1];
     if (dateStart && dateEnd) {
@@ -891,7 +938,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     }
     setDrag(null);
     void e;
-  }, [drag, mode, isAssigner, baseShipIdx, ships, activeDates, assignedCells]);
+  }, [drag, mode, isAssigner, baseShipIdx, rows, activeDates, assignedCells]);
 
   const onMouseLeave = useCallback(() => {
     setTooltip(null);
