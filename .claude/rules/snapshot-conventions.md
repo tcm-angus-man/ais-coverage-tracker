@@ -29,6 +29,15 @@ The `ships` array is the union of the voyage and silver universes:
 
 `in_service=false` ships are included but greyed in the row header (CoverageGrid renders them at 50% opacity). Phase 7 adds a filter to hide them.
 
+## Rows are per-MMSI, the payload is per-ship_id
+
+The payload keeps `ships` and `voyage_cells` keyed by `ships.id`. The grid
+collapses them to one row per MMSI at index time (`app/coverage/rows.ts`), so a
+renamed or resold hull renders as a single row under its current name while the
+tooltip can still name the ship a given day belonged to. Do not merge these
+rows in the snapshot — doing so destroys the per-day attribution the hover
+depends on. See `docs/superpowers/specs/2026-08-14-mmsi-row-model-design.md`.
+
 ## Date window
 
 Two anchored windows, not a rolling `DAYS_BACK`:
