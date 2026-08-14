@@ -13,12 +13,12 @@ import type { Cell, CoveragePayload, Ship } from "./types";
 import type { ShellMode } from "./CoverageShell";
 import { useAssignments } from "./AssignmentContext";
 import {
+  attributedShips,
   buildRows,
   mergeSilverCells,
   mergeVoyageCells,
   rowInService,
   rowIsOutOfService,
-  shipIsOutOfService,
   type Row,
 } from "./rows";
 
@@ -237,7 +237,7 @@ function drawOutOfServiceCell(ctx: CanvasRenderingContext2D, x: number, y: numbe
 type SortKey = "name" | "coverage_pct" | "coverage_days" | "activity" | "imo" | "cruise_line";
 
 type AssignmentInfo = { assignee: string; status: string; id: string; notes?: string; dateStart: string; dateEnd: string };
-type TooltipState = { x: number; y: number; ship: Ship; date: string; voyage?: Cell; silver?: Cell; assignment?: AssignmentInfo } | null;
+type TooltipState = { x: number; y: number; row: Row; owners: Ship[]; date: string; voyage?: Cell; silver?: Cell; assignment?: AssignmentInfo } | null;
 
 type DragState = { r0: number; c0: number; r1: number; c1: number } | null;
 
@@ -883,17 +883,22 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const hit = hitTest(e);
     if (!hit) { setTooltip(null); return; }
-    const ship = rows[hit.shipIdx].primary;
+    const row = rows[hit.shipIdx];
     const date = dates[hit.dateIdx];
-    const v = payload.voyage_cells[String(ship.id)]?.[date];
-    const s = payload.silver_cells[String(ship.id)]?.[date];
-    const assignment = assignedCells.get(`${ship.id}|${date}`);
-    setTooltip({ x: e.clientX, y: e.clientY, ship, date, voyage: v, silver: s, assignment });
+    // Cleanliness is MMSI-keyed and identical across members, so there is no
+    // per-day owner to resolve there — list every name on the hull instead.
+    const owners = mode === "silver" ? row.members : attributedShips(row, date, payload.voyage_cells);
+    // Read the merged layers, not the raw payload, so the tooltip agrees with
+    // the cell that was drawn.
+    const v = voyage.cells[hit.shipIdx][hit.dateIdx] ?? undefined;
+    const s = silver.cells[hit.shipIdx][hit.dateIdx] ?? undefined;
+    const assignment = assignedCells.get(`${row.primary.id}|${date}`);
+    setTooltip({ x: e.clientX, y: e.clientY, row, owners, date, voyage: v, silver: s, assignment });
     if (isDragging.current && mode === "silver") {
       setDrag(prev => prev ? { ...prev, r1: hit.r, c1: hit.c } : prev);
       setRenderTick(n => (n + 1) | 0);
     }
-  }, [hitTest, rows, dates, payload, mode, assignedCells]);
+  }, [hitTest, rows, dates, payload, mode, assignedCells, voyage, silver]);
 
   const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDragging.current || !drag || mode !== "silver") { isDragging.current = false; return; }
@@ -1351,10 +1356,19 @@ function Legend({ mode }: { mode: ShellMode }) {
 }
 
 function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; mode: ShellMode }) {
-  const { x, y, ship, date, voyage, silver, assignment } = tooltip;
+  const { x, y, row, owners, date, voyage, silver, assignment } = tooltip;
+  const ship = row.primary;
   const assigneeColor = assignment
     ? (ASSIGNEE_COLOR[assignment.assignee] ?? ASSIGNEE_COLOR_DEFAULT)
     : null;
+  // On a merged row, name the ship(s) this day actually belongs to. Suppressed
+  // on single-record hulls, where it would only repeat the header.
+  const showOwners = row.members.length > 1;
+  const ownerNames = owners.map(s => s.display_name).join(" · ");
+  // Members can carry different IMOs; surface any that differ from the primary's.
+  const otherImos = Array.from(new Set(
+    row.members.map(s => s.imo_number).filter(imo => imo && imo !== ship.imo_number),
+  ));
   return (
     <div style={{
       position: "fixed", zIndex: 50, pointerEvents: "none",
@@ -1370,8 +1384,13 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
     }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontWeight: 600 }}>{ship.display_name}</div>
+        {showOwners && (
+          <div style={{ fontSize: 10, color: C_INK_DIM, marginTop: 2 }}>
+            {mode === "silver" ? "shares MMSI: " : "this day: "}{ownerNames}
+          </div>
+        )}
         <div style={{ fontSize: 9.5, color: C_INK_FAINT, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
-          IMO {ship.imo_number} · MMSI {ship.mmsi}
+          IMO {ship.imo_number}{otherImos.length > 0 ? ` / ${otherImos.join(" / ")}` : ""} · MMSI {ship.mmsi}
         </div>
         {(ship.cruise_type || ship.service_start || ship.service_end) && (
           <div style={{ fontSize: 9.5, color: C_INK_FAINT, marginTop: 2 }}>
@@ -1381,7 +1400,7 @@ function HoverTooltip({ tooltip, mode }: { tooltip: NonNullable<TooltipState>; m
         )}
         <div style={{ fontSize: 10, color: C_INK_DIM, marginTop: 2 }}>{date}</div>
       </div>
-      {mode !== "silver" && shipIsOutOfService(ship, date) ? (
+      {mode !== "silver" && rowIsOutOfService(row, date) ? (
         <div style={{ color: C_INK_FAINT, fontStyle: "italic" }}>out of service on this date</div>
       ) : (
         <>
