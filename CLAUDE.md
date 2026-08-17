@@ -4,6 +4,20 @@ Internal Next.js app for The Cruise Group: a coordination layer over the AIS cov
 
 Behind Google SSO, gated to `@thecruisemaps.com`. Not customer-facing.
 
+## Operating mode
+
+Fable mode is always on in this repo — no need for the user to say "fable mode".
+
+Apply it per its own "scale rigor to stakes" rule (full rigor for anything touching behavior, none of the ceremony for trivial edits):
+
+@~/.claude/skills/fable-mode/SKILL.md
+
+## Learning capture
+
+After solving any non-trivial problem (debugging, architecture decision, tricky build), use the extract-approach skill and write the learnings note before closing the task.
+
+Notes go to `learnings/<date>-<slug>.md` in the repo root.
+
 ## Stack
 
 - Next.js 14 App Router, TypeScript strict, Tailwind, ESLint
