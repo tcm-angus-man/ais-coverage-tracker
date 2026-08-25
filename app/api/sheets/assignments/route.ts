@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { sheetsAppend } from "@/lib/sheets/client";
 import { TEAM_MEMBERS } from "@/lib/sheets/team-config";
+import { canAssign } from "@/lib/roles";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +26,8 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ ok: false, error: "unauthenticated" }, { status: 401 });
     }
-    // Only assigners can create assignments
-    if (session.user.role !== "assigner") {
+    // Assigners, plus cleaners carrying the can_assign capability
+    if (!canAssign(session)) {
       return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
     }
 

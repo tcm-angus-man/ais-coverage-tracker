@@ -263,6 +263,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const { addDraft, drafts: assignments, reload: reloadAssignments } = useAssignments();
   const { data: session } = useSession();
   const isAssigner = session?.user?.role === "assigner";
+  // Assignment creation is broader than the assigner role — cleaners carrying
+  // can_assign may create too. Editing others' assignments stays assigner-only.
+  const canAssign = isAssigner || session?.user?.can_assign === true;
 
   const scrollRef    = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
@@ -926,13 +929,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       if (existing) {
         // Open edit modal using the assignment's own date range (may be a month-range bulk row)
         setEditModal({ assignment: existing, ship, dateStart: existing.dateStart, dateEnd: existing.dateEnd });
-      } else if (isAssigner) {
+      } else if (canAssign) {
         setAssignModal({ ship, dateStart, dateEnd });
       }
     }
     setDrag(null);
     void e;
-  }, [drag, mode, isAssigner, baseShipIdx, rows, activeDates, assignedCells]);
+  }, [drag, mode, canAssign, baseShipIdx, rows, activeDates, assignedCells]);
 
   const onMouseLeave = useCallback(() => {
     setTooltip(null);
@@ -1035,7 +1038,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           <>
             <Divider />
             <CtrlLabel>Assignee</CtrlLabel>
-            <AssigneeFilterPills
+            <AssigneeFilterSelect
               assigneeFilter={assigneeFilter}
               setAssigneeFilter={setAssigneeFilter}
               session={session}
@@ -1043,7 +1046,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           </>
         )}
 
-        {mode === "silver" && isAssigner && (
+        {mode === "silver" && canAssign && (
           <span style={{ fontSize: 9.5, color: C_VISIBLE, letterSpacing: "0.04em" }}>
             ↖ drag to select cells for assignment
           </span>
@@ -1331,7 +1334,7 @@ const selectStyle: React.CSSProperties = {
 function Legend({ mode }: { mode: ShellMode }) {
   const oosEntry = { color: C_OUT_OF_SERVICE, label: "Out of service", border: true };
   const entries = mode === "silver"
-    ? [{ color: C_SILVER_OK, label: "Clean" }, { color: C_SILVER_NR, label: "Needs review" }, { color: C_MISSING, label: "No data", border: true }, oosEntry]
+    ? [{ color: C_SILVER_OK, label: "Clean" }, { color: C_SILVER_OK, label: "Cleaned", borderColor: C_UPDATED }, { color: C_SILVER_NR, label: "Needs review" }, { color: C_MISSING, label: "No data", border: true }, oosEntry]
     : mode === "voyage"
       ? [
           { color: C_VISIBLE,   label: "Visible" },
@@ -1346,13 +1349,13 @@ function Legend({ mode }: { mode: ShellMode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       {entries.map(e => {
-        const { border } = e as { border?: boolean };
+        const { border, borderColor } = e as { border?: boolean; borderColor?: string };
         return (
           <div key={e.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{
               display: "inline-block", width: 9, height: 9, borderRadius: 2,
               background: e.color,
-              border: border ? `1px solid ${C_LINE}` : undefined,
+              border: borderColor ? `1px solid ${borderColor}` : border ? `1px solid ${C_LINE}` : undefined,
             }} />
             <span style={{ fontSize: 9.5, color: C_INK_FAINT }}>{e.label}</span>
           </div>
@@ -1660,49 +1663,55 @@ function EditAssignmentModal({ assignment, ship, dateStart, dateEnd, isAssigner,
   );
 }
 
-// Assignee filter pills for the cleanliness tab controls bar.
+// Assignee filter for the cleanliness tab controls bar.
 // Cleaners see "All" + "Assigned to me" only.
-// Assigners see "All" + one pill per live-data team member.
-function AssigneeFilterPills({ assigneeFilter, setAssigneeFilter, session }: {
+// Anyone who can assign sees the whole team, live-data members grouped first.
+function AssigneeFilterSelect({ assigneeFilter, setAssigneeFilter, session }: {
   assigneeFilter: string;
   setAssigneeFilter: (v: string) => void;
   session: ReturnType<typeof useSession>["data"];
 }) {
-  const isAssigner = session?.user?.role === "assigner";
+  const canAssign = session?.user?.role === "assigner" || session?.user?.can_assign === true;
   const mySlug = session?.user?.slug ?? "";
 
-  const pills: { label: string; value: string; color?: string }[] = [
-    { label: "All", value: "" },
-  ];
+  const liveData = ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug));
+  const others   = ASSIGNABLE_MEMBERS.filter(m => !LIVE_DATA_TEAM.has(m.slug));
 
-  if (isAssigner) {
-    for (const m of ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug))) {
-      pills.push({ label: m.display_name, value: m.slug, color: ASSIGNEE_COLOR[m.slug] });
-    }
-  } else if (mySlug) {
-    pills.push({ label: "Assigned to me", value: mySlug, color: ASSIGNEE_COLOR[mySlug] ?? ASSIGNEE_COLOR_DEFAULT });
-  }
+  // The option list can't carry the assignee colour (options aren't styleable
+  // cross-browser), so the select itself takes it while a filter is active.
+  const activeColor = assigneeFilter
+    ? (ASSIGNEE_COLOR[assigneeFilter] ?? ASSIGNEE_COLOR_DEFAULT)
+    : null;
 
   return (
-    <div style={{ display: "flex", gap: 4 }}>
-      {pills.map(p => {
-        const active = assigneeFilter === p.value;
-        const col = p.color ?? C_INK_DIM;
-        return (
-          <button
-            key={p.value}
-            onClick={() => setAssigneeFilter(p.value)}
-            style={{
-              padding: "3px 9px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
-              fontSize: 10, border: `1px solid ${active ? col : C_LINE}`,
-              background: active ? `${col}22` : "transparent",
-              color: active ? col : C_INK_FAINT, fontWeight: active ? 600 : 400,
-            }}
-          >
-            {p.label}
-          </button>
-        );
-      })}
-    </div>
+    <select
+      value={assigneeFilter}
+      onChange={e => setAssigneeFilter(e.target.value)}
+      style={{
+        ...selectStyle,
+        minWidth: 130,
+        borderColor: activeColor ?? C_LINE,
+        color: activeColor ?? C_INK,
+        fontWeight: activeColor ? 600 : 400,
+      }}
+    >
+      <option value="">All assignees</option>
+      {canAssign ? (
+        <>
+          <optgroup label="Live data">
+            {liveData.map(m => (
+              <option key={m.slug} value={m.slug}>{m.display_name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Team">
+            {others.map(m => (
+              <option key={m.slug} value={m.slug}>{m.display_name}</option>
+            ))}
+          </optgroup>
+        </>
+      ) : mySlug ? (
+        <option value={mySlug}>Assigned to me</option>
+      ) : null}
+    </select>
   );
 }

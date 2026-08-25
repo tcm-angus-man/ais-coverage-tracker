@@ -14,6 +14,12 @@ export function isAssigner(session: Session | null): boolean {
   return session?.user?.role === "assigner";
 }
 
+// Assignment creation. Assigners always qualify; cleaners only with the
+// can_assign capability. Does NOT imply admin-route access.
+export function canAssign(session: Session | null): boolean {
+  return isAssigner(session) || session?.user?.can_assign === true;
+}
+
 export function isCleaner(session: Session | null): boolean {
   return session?.user?.role === "cleaner";
 }

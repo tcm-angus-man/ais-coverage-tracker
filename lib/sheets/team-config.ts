@@ -11,6 +11,9 @@ export type TeamMember = {
   // Ai-ai's slug is "ai-ai" (used in colors, LIVE_DATA_TEAM, filters) but her
   // email is aiai@thecruisemaps.com.
   email_local?: string;
+  // Cleaners who may also create assignments. Narrower than role "assigner":
+  // grants assignment creation only, not the admin routes.
+  can_assign?: boolean;
 };
 
 // Maps db updated_by value → display name. data-platform is the system default
@@ -21,13 +24,13 @@ export const TEAM_MEMBERS: TeamMember[] = [
   { slug: "bea",      display_name: "Bea",      db_user_id: "11", role: "cleaner",  active: true },
   { slug: "ronnel",   display_name: "Ronnel",   db_user_id: "12", role: "cleaner",  active: true },
   { slug: "kaye",     display_name: "Kaye",     db_user_id: "13", role: "cleaner",  active: true },
-  { slug: "coleen",   display_name: "Coleen",   db_user_id: "16", role: "cleaner",  active: true },
-  { slug: "kim",      display_name: "Kim",      db_user_id: "17", role: "cleaner",  active: true },
-  { slug: "nick",     display_name: "Nick",     db_user_id: "19", role: "cleaner",  active: true },
+  { slug: "coleen",   display_name: "Coleen",   db_user_id: "16", role: "cleaner",  active: true, can_assign: true },
+  { slug: "kim",      display_name: "Kim",      db_user_id: "17", role: "cleaner",  active: true, can_assign: true },
+  { slug: "nick",     display_name: "Nick",     db_user_id: "19", role: "cleaner",  active: true, can_assign: true },
   { slug: "nicole",   display_name: "Nicole",   db_user_id: "21", role: "cleaner",  active: true },
   { slug: "jayziel",  display_name: "Jayziel",  db_user_id: "22", role: "cleaner",  active: true },
-  { slug: "ai-ai",    display_name: "Ai-ai",    db_user_id: "23", role: "cleaner",  active: true, email_local: "aiai" },
-  { slug: "rome",     display_name: "Rome",     db_user_id: "26", role: "cleaner",  active: true },
+  { slug: "ai-ai",    display_name: "Ai-ai",    db_user_id: "23", role: "cleaner",  active: true, can_assign: true, email_local: "aiai" },
+  { slug: "rome",     display_name: "Rome",     db_user_id: "26", role: "cleaner",  active: true, can_assign: true },
   { slug: "rich",     display_name: "Rich",     db_user_id: "28", role: "assigner", active: true },
   { slug: "dave",     display_name: "Dave",     db_user_id: "29", role: "cleaner",  active: true },
   { slug: "jen",      display_name: "Jen",      db_user_id: "31", role: "cleaner",  active: true },
