@@ -12,6 +12,9 @@ import { useSession } from "next-auth/react";
 import type { Cell, CoveragePayload, Ship } from "./types";
 import type { ShellMode } from "./CoverageShell";
 import { useAssignments } from "./AssignmentContext";
+// Imported rather than re-declared so the grid's silver window can't drift
+// from the window the snapshot query actually uses.
+import { SILVER_START } from "@/lib/snapshot/types";
 import {
   attributedShips,
   buildRows,
@@ -173,7 +176,6 @@ function indexPayload(payload: CoveragePayload): Indexed {
     return { cells };
   };
 
-  const SILVER_START = "2025-07-01";
   const silverDateOffset = Math.max(0, dates.findIndex(d => d >= SILVER_START));
   const silverDates = dates.slice(silverDateOffset);
 

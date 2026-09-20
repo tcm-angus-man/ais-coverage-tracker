@@ -43,9 +43,9 @@ depends on. See `docs/superpowers/specs/2026-08-14-mmsi-row-model-design.md`.
 Two anchored windows, not a rolling `DAYS_BACK`:
 
 - **Voyage cells**: `2015-01-01` → today
-- **Silver cells**: `2025-07-01` → today
+- **Silver cells**: `2015-01-01` → today (was `2025-07-01`; widened when `ais_silver` was backfilled across the fleet)
 
-The payload's `dates` array spans the voyage window (the wider of the two). `silver_cells` is naturally empty for dates before `2025-07-01`. End-dates are computed at cron time.
+Both windows now start on the same day, so the payload's `dates` array spans both. `silver_cells` is sparse wherever the backfill hasn't reached yet — a missing day renders as no-data, not as a gap. End-dates are computed at cron time.
 
 ## Silver "clean" criterion
 

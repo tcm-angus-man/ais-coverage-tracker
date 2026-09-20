@@ -25,7 +25,7 @@ const TAB_META: Record<ShellMode, { eyebrow: string; title: string; titleAccent:
     eyebrow:       "AIS Coverage · Silver",
     title:         "Silver",
     titleAccent:   "Cleanliness",
-    subtitle:      "Each cell = one cleaned ship-day. From 2025-07-01.",
+    subtitle:      "Each cell = one cleaned ship-day. From 2015-01-01.",
     accentVar:     "var(--clean-edge)",
     gradientColor: "rgba(78,163,116,0.025)",
   },

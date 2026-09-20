@@ -51,5 +51,7 @@ export type SilverCellRow = {
 };
 
 // Two anchored windows — see .claude/rules/snapshot-conventions.md
+// Both start 2015-01-01 as of the ais_silver backfill: silver coverage is no
+// longer a narrower window than voyage coverage, so the two axes now align.
 export const VOYAGE_START = "2015-01-01";
-export const SILVER_START = "2025-07-01";
+export const SILVER_START = "2015-01-01";

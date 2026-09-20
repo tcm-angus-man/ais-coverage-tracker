@@ -21,7 +21,7 @@ This is the working version of the brief. Update as decisions land.
    - **Voyage:** every non-river-cruise ship with an `mmsi` that has ever been requested (a voyage linked to `prints.id`). Not date-windowed.
    - **Silver:** ships present in `silver_cells` over the silver window.
    The `ships` array is the union.
-3. **Date window.** Two anchored windows — voyage from `2015-01-01`, silver from `2025-07-01`, both ending today. `SNAPSHOT_DAYS_BACK` is dropped.
+3. **Date window.** Two anchored windows — voyage from `2015-01-01`, silver from `2015-01-01` (originally `2025-07-01`, widened once `ais_silver` was backfilled fleet-wide), both ending today. `SNAPSHOT_DAYS_BACK` is dropped.
 4. **`imo_siblings`.** Dropped from the `Ship` type.
 5. **Status `done` = reviewed.** A ship-day is `done` iff all four `silver_state` anomaly counts are zero: `delta_time_count`, `delta_distance_count`, `spike_count`, `overland_count`. Terminal in the assignment lifecycle.
 6. **Notes.** Single append-only `notes` column on the assignment row, each entry prefixed `[author @ ISO]\n`.
