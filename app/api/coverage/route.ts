@@ -1,26 +1,37 @@
 import { NextResponse } from "next/server";
 import type { CoveragePayload } from "@/app/coverage/types";
-import { readCoverageBlob } from "@/lib/snapshot/blob";
-import { decompressJson } from "@/lib/snapshot/compress";
+import { readCoverageBlobWithMeta } from "@/lib/snapshot/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Phase 1: read brotli-compressed snapshot from Vercel Blob, decompress, return.
-// Cache for 1h (matches the cron cadence). If the Blob has never been written
-// (cold start before the first cron run), fall through to a tiny fixture in
-// non-production so the heatmap still renders. In production, surface a 503
-// — per snapshot-conventions.md "Failure mode": stale is fine, missing is not,
-// don't synthesise.
+// Phase 1: stream the brotli-compressed snapshot from Vercel Blob straight to
+// the client. Cache for 1h (matches the cron cadence). If the Blob has never
+// been written (cold start before the first cron run), fall through to a tiny
+// fixture in non-production so the heatmap still renders. In production,
+// surface a 503 — per snapshot-conventions.md "Failure mode": stale is fine,
+// missing is not, don't synthesise.
+//
+// The bytes are served verbatim under `Content-Encoding: br`. We used to
+// decompress here and hand the parsed object to NextResponse.json(), which
+// re-serialised the entire snapshot on every request — ~379MB of response body
+// and ~2.2GB RSS at projected post-backfill volume, and it ran on every page
+// load because the route was `no-store`. The browser decodes `br` for us, so
+// the client's existing fetch → TextDecoder → JSON.parse path is unchanged.
 export async function GET() {
   try {
-    const buf = await readCoverageBlob();
-    if (!buf) throw new Error("blob not found — cron has not run yet");
-    const payload = await decompressJson<CoveragePayload>(buf);
-    return NextResponse.json(payload, {
+    const blob = await readCoverageBlobWithMeta();
+    if (!blob) throw new Error("blob not found — cron has not run yet");
+    return new Response(blob.body, {
       headers: {
-        "Cache-Control": "no-store",
-        ETag: `"${payload.generated_at}"`,
+        "Content-Type": "application/json",
+        "Content-Encoding": "br",
+        // `private` because middleware.ts gates this route behind the Google
+        // SSO domain check — a shared/CDN cache must not hold company data.
+        // max-age matches the hourly cron; it replaces `no-store`, which made
+        // every page load re-pay the full cost of this route.
+        "Cache-Control": "private, max-age=3600",
+        ETag: `"${blob.etag}"`,
       },
     });
   } catch (err) {

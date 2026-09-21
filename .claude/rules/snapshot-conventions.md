@@ -67,8 +67,10 @@ type CoveragePayload = {
 ## Storage
 
 - Brotli-compressed `coverage-latest.json` on Vercel Blob.
-- ETag is the `generated_at` ISO string.
-- `Cache-Control: max-age=3600` on `/api/coverage` (matches cron cadence).
+- `/api/coverage` serves those bytes **verbatim** under `Content-Type: application/json` + `Content-Encoding: br`. It does not decompress or re-serialise — the browser decodes `br` transparently. Decompressing server-side cost a full re-stringify of the snapshot per request.
+- ETag is the Blob's own etag, not `generated_at` — reaching `generated_at` would mean parsing the payload, which is the cost we're avoiding.
+- `Cache-Control: private, max-age=3600` on `/api/coverage` (matches cron cadence). `private` because `middleware.ts` gates the route behind the SSO domain check — a shared cache must not hold the payload.
+- The route serves `br` regardless of the request's `Accept-Encoding`. Every browser sends `br`, and the only consumer is `CoverageLoader`, so this is deliberate — but a client without brotli (e.g. a curl build lacking it) cannot read this endpoint.
 - One file. Not versioned. Cron overwrites.
 
 ## Indexing notes

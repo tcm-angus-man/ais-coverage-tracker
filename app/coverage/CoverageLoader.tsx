@@ -74,7 +74,12 @@ export default function CoverageLoader({ modeOverride = "voyage" }: { modeOverri
     );
   }
   if (!payload) {
-    const pct = progress.total && progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : null;
+    // `content-length` is the COMPRESSED size under Content-Encoding: br, while
+    // the reader yields decoded bytes — so the two stop being comparable once
+    // `received` overtakes it. Fall back to a plain byte counter there; the
+    // percentage still works for the uncompressed dev fallback.
+    const comparable = progress.total !== null && progress.total > 0 && progress.received <= progress.total;
+    const pct = comparable ? Math.round((progress.received / progress.total!) * 100) : null;
     const mb  = (progress.received / 1024 / 1024).toFixed(1);
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", background: "var(--bg)", gap: 12 }}>
