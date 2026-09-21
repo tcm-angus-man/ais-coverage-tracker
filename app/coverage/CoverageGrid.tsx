@@ -15,6 +15,7 @@ import { useAssignments } from "./AssignmentContext";
 // Imported rather than re-declared so the grid's silver window can't drift
 // from the window the snapshot query actually uses.
 import { SILVER_START } from "@/lib/snapshot/types";
+import { computeSilverKpis, mergedDayOutcome } from "./kpis";
 import {
   attributedShips,
   buildRows,
@@ -291,6 +292,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const { w: CELL_W, h: CELL_H } = DENSITY_SIZES[density];
 
   const isSilver = mode === "silver";
+  const isMerged = mode === "combined";
   const activeDates      = isSilver ? silverDates : dates;
   const activeDateOffset = isSilver ? silverDateOffset : 0;
 
@@ -552,21 +554,20 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const kpis = useMemo(() => {
     if (isSilver) {
       // Rows are already one-per-MMSI and their silver cells are merged, so the
-      // old per-group merge here is gone. Out-of-service days are still counted:
-      // cleanliness is MMSI-keyed and every cleaned ship-day counts.
-      let withData = 0, needsReview = 0, missing = 0;
-      for (const si of baseShipIdx) {
-        for (let di = silverDateOffset; di < dates.length; di++) {
-          const cell = silver.cells[si][di];
-          if (!cell || cell.t === 0) { missing++; continue; }
-          withData++;
-          if ((cell.dt + cell.dd + cell.sp + cell.ol) > 0) needsReview++;
-        }
-      }
-      const cleanDays = withData - needsReview;
-      const totalDays = withData + missing;
-      const pct = totalDays === 0 ? 0 : Math.round((cleanDays / totalDays) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: silverDates.length, pct, label: "cleaned", withData, needsReview, missing };
+      // old per-group merge here is gone. See computeSilverKpis for why
+      // cleanliness is measured against days with data rather than the axis.
+      const k = computeSilverKpis(baseShipIdx, rows, dates, silver.cells);
+      return {
+        ships: baseShipIdx.length,
+        dates: silverDates.length,
+        pct: k.cleanedPct,
+        label: "cleaned",
+        withData: k.withData,
+        needsReview: k.needsReview,
+        missing: k.missing,
+        ingestedPct: k.ingestedPct,
+        inServiceDays: k.inServiceDays,
+      };
     } else {
       // COVID window: days in this range with no legit coverage are excluded from denominator
       const COVID_START = "2020-03-01";
@@ -621,17 +622,29 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           const inCovid = covidWindowLen > 0 && d >= covidStartIdx && d <= covidEndIdx;
           const covidExclude = inCovid && !hasVisible && !(qualifiedCovidIdx?.has(d));
           if (covidExclude) { covidExcluded++; continue; }
-          if (!hasVisible) { missing++; } else { withData++; }
           if (hasVoyage) { requested++; }
+          if (isMerged) {
+            // Take whichever layer carries a cleaned signal for this day:
+            // silver where it has data, voyage coverage otherwise.
+            const outcome = mergedDayOutcome(silver.cells[si][d], cell);
+            if (outcome === "none") { missing++; } else { withData++; }
+            if (outcome === "review") needsReview++;
+            continue;
+          }
+          if (!hasVisible) { missing++; } else { withData++; }
           if (hasVisible && (cell.dw > cell.v || cell.na > cell.v)) needsReview++;
         }
       }
       const total = withData + missing;
-      const pct        = total     === 0 ? 0 : Math.round((withData / total)     * 1000) / 10;
+      // Merged counts a day as good only when the winning layer says it is
+      // clean, so its headline is "cleaned"; the voyage tab keeps "covered".
+      const pct = total === 0
+        ? 0
+        : Math.round(((isMerged ? withData - needsReview : withData) / total) * 1000) / 10;
       const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
+      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: isMerged ? "cleaned" : "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
     }
-  }, [isSilver, baseShipIdx, silverDateOffset, dates, silver, voyage, silverDates, rows]);
+  }, [isSilver, isMerged, baseShipIdx, dates, silver, voyage, silverDates, rows]);
 
   const rowCount = baseShipIdx.length;
   const colCount = activeDates.length;
@@ -953,7 +966,14 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         <KpiDivider />
         <KpiStat value={kpis.withData.toLocaleString()} label="days with data" color={C_VISIBLE} />
         <KpiStat value={kpis.needsReview.toLocaleString()} label="needs review" color={kpis.needsReview > 0 ? C_DW : C_INK_FAINT} />
-        <KpiStat value={kpis.missing.toLocaleString()} label={isSilver ? "no data" : "no voyage"} color={C_INK_FAINT} />
+        <KpiStat
+          value={kpis.missing.toLocaleString()}
+          label={isSilver ? "no data" : isMerged ? "neither layer" : "no voyage"}
+          color={C_INK_FAINT}
+          tooltip={isSilver
+            ? "In-service ship-days we hold no AIS data for. Days before a hull entered service or after it left are excluded."
+            : undefined}
+        />
         <KpiDivider />
         <KpiStat
           value={`${kpis.pct}%`}
@@ -963,7 +983,17 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
             ? `COVID adjustment: ${(kpis.covidExcluded ?? 0).toLocaleString()} ship-days in Mar 2020 – Nov 2021 excluded from the denominator. Days in that window are only counted for ships with a continuous run of ≥10 days of visible-on-globe coverage anchored to either end of the period.`
             : undefined}
         />
-        {!isSilver && (
+        {isSilver && (
+          <KpiStat
+            value={`${kpis.ingestedPct ?? 0}%`}
+            label="ingested"
+            color={(kpis.ingestedPct ?? 0) > 50 ? C_VISIBLE : C_DW}
+            tooltip={`Share of in-service ship-days with any AIS data: ${(kpis.withData ?? 0).toLocaleString()} of ${(kpis.inServiceDays ?? 0).toLocaleString()}. Tracks backfill progress, separately from how clean that data is.`}
+          />
+        )}
+        {/* Voyage-only: merged's withData counts silver-only days, which are
+            not in `requested`, so the ratio would be meaningless there. */}
+        {!isSilver && !isMerged && (
           <KpiStat
             value={`${kpis.requestPct}%`}
             label="coverage / request"
