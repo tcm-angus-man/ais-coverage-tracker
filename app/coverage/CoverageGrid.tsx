@@ -624,8 +624,8 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           if (covidExclude) { covidExcluded++; continue; }
           if (hasVoyage) { requested++; }
           if (isMerged) {
-            // Take whichever layer carries a cleaned signal for this day:
-            // silver where it has data, voyage coverage otherwise.
+            // Outer join: the day is done if EITHER layer completed it, so the
+            // layers cover each other's gaps and merged >= both single layers.
             const outcome = mergedDayOutcome(silver.cells[si][d], cell);
             if (outcome === "none") { missing++; } else { withData++; }
             if (outcome === "review") needsReview++;
@@ -636,13 +636,13 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         }
       }
       const total = withData + missing;
-      // Merged counts a day as good only when the winning layer says it is
-      // clean, so its headline is "cleaned"; the voyage tab keeps "covered".
+      // Merged counts a day done when either layer completed it, so its
+      // headline is "completed"; the voyage tab keeps "covered".
       const pct = total === 0
         ? 0
         : Math.round(((isMerged ? withData - needsReview : withData) / total) * 1000) / 10;
       const requestPct = requested === 0 ? 0 : Math.round((withData / requested) * 1000) / 10;
-      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: isMerged ? "cleaned" : "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
+      return { ships: baseShipIdx.length, dates: dates.length, pct, requestPct, label: isMerged ? "completed" : "covered", withData, needsReview, missing, requested, covidExcluded, oosExcluded };
     }
   }, [isSilver, isMerged, baseShipIdx, dates, silver, voyage, silverDates, rows]);
 

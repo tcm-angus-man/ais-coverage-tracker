@@ -74,22 +74,28 @@ export function computeSilverKpis(
   };
 }
 
-export type DayOutcome = "clean" | "review" | "none";
+export type DayOutcome = "done" | "review" | "none";
 
 /**
- * Merged-tab verdict for one ship-day: take whichever layer carries a cleaned
- * signal for that day. Silver wins where it has data, because it's the layer
- * that actually measures cleanliness; otherwise fall back to voyage coverage.
+ * Merged-tab verdict for one ship-day — an outer join of the two layers.
  *
- * Note this is a coalesce, not a union — a day silver marks dirty stays dirty
- * even if the voyage layer shows it as visible.
+ * A day is **done** when EITHER layer says so: the voyage layer has visible
+ * coverage, or the silver layer has data with all four anomaly counts at zero.
+ * The layers cover for each other's gaps, so merged sits at or above both
+ * single-layer numbers by construction — a day one layer missed still counts
+ * when the other caught it.
+ *
+ * This is a union, not a coalesce: silver flagging a day dirty does NOT undo
+ * the voyage layer having it visible. Only a day that neither layer completed
+ * can be `review` or `none`, and the split between those two is whether there
+ * is any data to act on at all.
  */
 export function mergedDayOutcome(silver: Cell | null, voyage: Cell | null): DayOutcome {
-  if (silver && silver.t > 0) {
-    return silver.dt + silver.dd + silver.sp + silver.ol > 0 ? "review" : "clean";
-  }
-  if (voyage && voyage.v >= 1) {
-    return voyage.dw > voyage.v || voyage.na > voyage.v ? "review" : "clean";
-  }
+  const silverHasData = silver !== null && silver.t > 0;
+  const silverClean = silverHasData && silver.dt + silver.dd + silver.sp + silver.ol === 0;
+  const voyageVisible = voyage !== null && voyage.v >= 1;
+
+  if (silverClean || voyageVisible) return "done";
+  if (silverHasData || (voyage !== null && voyage.t > 0)) return "review";
   return "none";
 }

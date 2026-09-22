@@ -108,25 +108,54 @@ describe("computeSilverKpis", () => {
 });
 
 describe("mergedDayOutcome", () => {
-  it("prefers the silver verdict when silver has data", () => {
-    // Voyage says visible, silver says dirty — silver wins, because silver is
-    // the layer that actually measures cleanliness.
-    expect(mergedDayOutcome(dirty(), { ...clean(), v: 3, t: 3 })).toBe("review");
-    expect(mergedDayOutcome(clean(), null)).toBe("clean");
+  const voy = (over: Partial<Cell> = {}): Cell => ({ t: 2, v: 2, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0, ...over });
+
+  // The point of the merged view: the two layers cover each other's gaps.
+  it("counts the day done when EITHER layer completed it", () => {
+    expect(mergedDayOutcome(clean(), null)).toBe("done");                    // silver only
+    expect(mergedDayOutcome(null, voy())).toBe("done");                      // voyage only
+    expect(mergedDayOutcome(clean(), voy())).toBe("done");                   // both
   });
 
-  it("falls back to voyage coverage where silver has no data", () => {
-    expect(mergedDayOutcome(null, { t: 2, v: 2, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 })).toBe("clean");
-    expect(mergedDayOutcome(clean(0), { t: 2, v: 2, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 })).toBe("clean");
+  // This is the correction that matters: a union, not a coalesce. Silver
+  // flagging a day dirty must not cancel out the voyage layer having it
+  // visible, or merged would drop BELOW the voyage number.
+  it("does not let a dirty silver day cancel visible voyage coverage", () => {
+    expect(mergedDayOutcome(dirty(), voy())).toBe("done");
   });
 
-  it("flags voyage days whose problem counts outweigh visible coverage", () => {
-    expect(mergedDayOutcome(null, { t: 2, v: 1, na: 0, dw: 2, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 })).toBe("review");
-    expect(mergedDayOutcome(null, { t: 2, v: 1, na: 2, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 })).toBe("review");
+  it("is review only when neither layer completed it but data exists", () => {
+    expect(mergedDayOutcome(dirty(), null)).toBe("review");                  // dirty silver alone
+    expect(mergedDayOutcome(null, voy({ v: 0 }))).toBe("review");            // requested, not visible
+    expect(mergedDayOutcome(dirty(), voy({ v: 0 }))).toBe("review");         // both present, neither done
   });
 
-  it("reports none only when neither layer covers the day", () => {
+  it("is none only when neither layer has anything", () => {
     expect(mergedDayOutcome(null, null)).toBe("none");
-    expect(mergedDayOutcome(null, { t: 1, v: 0, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 })).toBe("none");
+    expect(mergedDayOutcome(clean(0), null)).toBe("none");                   // zero row_count is no data
+    expect(mergedDayOutcome(clean(0), voy({ t: 0, v: 0 }))).toBe("none");
+  });
+
+  // A visible voyage day counts as done even when its own problem counts are
+  // high — "visible or clean" is the rule, per the merged-tab definition.
+  it("treats visible voyage days as done regardless of their flags", () => {
+    expect(mergedDayOutcome(null, voy({ v: 1, dw: 5, na: 5 }))).toBe("done");
+  });
+
+  // The property the merged number must satisfy: never below either layer.
+  it("is never below what either layer would score alone", () => {
+    const days: [Cell | null, Cell | null][] = [
+      [clean(), null], [dirty(), null], [null, voy()], [null, voy({ v: 0 })],
+      [clean(), voy()], [dirty(), voy()], [dirty(), voy({ v: 0 })], [null, null],
+    ];
+    const merged = days.filter(([sc, vc]) => mergedDayOutcome(sc, vc) === "done").length;
+    const silverAlone = days.filter(([sc]) => sc !== null && sc.t > 0 && sc.dt + sc.dd + sc.sp + sc.ol === 0).length;
+    const voyageAlone = days.filter(([, vc]) => vc !== null && vc.v >= 1).length;
+
+    expect(merged).toBeGreaterThanOrEqual(silverAlone);
+    expect(merged).toBeGreaterThanOrEqual(voyageAlone);
+    // and strictly higher here, because each layer completes days the other missed
+    expect(merged).toBeGreaterThan(silverAlone);
+    expect(merged).toBeGreaterThan(voyageAlone);
   });
 });
