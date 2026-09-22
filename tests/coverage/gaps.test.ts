@@ -122,6 +122,8 @@ describe("buildGapRuns", () => {
     });
     expect(runs).toHaveLength(2);
     expect(runs.map(r => r.mmsi).sort()).toEqual([111, 222]);
+    // Identity columns come from the row's primary record.
+    expect(runs.every(r => r.imo === "9000001")).toBe(true);
     expect(runs.every(r => r.days === 2)).toBe(true);
   });
 

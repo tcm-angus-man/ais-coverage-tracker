@@ -11,6 +11,13 @@ export type GapClass = "high" | "blackout";
 export type GapRun = {
   rowIdx: number;
   mmsi: number;
+  /**
+   * IMO of the row's primary ship record. Blank when the snapshot has none.
+   * Taken from the primary rather than merged across members because a
+   * shared-MMSI row can hold two hulls with different IMOs, and the primary is
+   * the identity the row is labelled with.
+   */
+  imo: string;
   shipName: string;
   cruiseLine: string;
   /** Primary ship_id for the row — what an assignment is keyed on. */
@@ -142,6 +149,7 @@ export function buildGapRuns(args: BuildGapRunsArgs): GapRun[] {
       open = {
         rowIdx: si,
         mmsi: row.mmsi,
+        imo: row.primary.imo_number,
         shipName: row.primary.display_name || row.primary.name,
         cruiseLine: row.primary.cruise_line,
         shipId: row.primary.id,

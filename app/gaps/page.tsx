@@ -286,7 +286,10 @@ function RunTable({ runs, canAssign, busy, onAssign }: { runs: GapRun[]; canAssi
             style={{ display: "flex", alignItems: "center", gap: 14, padding: "7px 12px", borderBottom: `1px solid ${C_LINE}`, background: C_PANEL, fontSize: 11.5 }}
           >
             <span style={{ width: 8, height: 8, borderRadius: 1, background: r.classification === "high" ? C_HIGH : C_BLACKOUT, flexShrink: 0 }} />
-            <span style={{ flex: "1 1 220px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.shipName}</span>
+            <span style={{ flex: "1 1 200px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.shipName}</span>
+            <span style={{ width: 190, flexShrink: 0, color: C_INK_FAINT, fontSize: 10, fontVariantNumeric: "tabular-nums", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              MMSI {r.mmsi > 0 ? r.mmsi : "—"} · IMO {r.imo || "—"}
+            </span>
             <span style={{ color: C_INK_DIM, fontVariantNumeric: "tabular-nums" }}>{r.dateStart} → {r.dateEnd}</span>
             <span style={{ color: C_INK_FAINT, fontVariantNumeric: "tabular-nums", width: 52, textAlign: "right" }}>{r.days}d</span>
             <span style={{ width: 150, textAlign: "right", color: C_INK_FAINT, fontSize: 10.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
