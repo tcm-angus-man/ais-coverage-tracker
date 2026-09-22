@@ -14,8 +14,9 @@ const TABS = [
   { href: "/coverage",    label: "Coverage",    n: "01" },
   { href: "/cleanliness", label: "Cleanliness", n: "02" },
   { href: "/merged",      label: "Merged",      n: "03" },
-  { href: "/queue",       label: "Queue",        n: "04" },
-  { href: "/progress",   label: "Progress",     n: "05" },
+  { href: "/gaps",        label: "Gaps",        n: "04" },
+  { href: "/queue",       label: "Queue",        n: "05" },
+  { href: "/progress",   label: "Progress",     n: "06" },
 ];
 
 export default function Nav() {

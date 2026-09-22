@@ -99,3 +99,83 @@ export function mergedDayOutcome(silver: Cell | null, voyage: Cell | null): DayO
   if (silverHasData || (voyage !== null && voyage.t > 0)) return "review";
   return "none";
 }
+
+// ---------- shared eligibility ----------
+// Which ship-days enter the voyage / merged denominator. Extracted from
+// CoverageGrid so /gaps classifies exactly the same population the Merged KPI
+// measures — if these ever diverge the two views stop reconciling, so there is
+// deliberately only one implementation.
+
+export const COVID_START = "2020-03-01";
+export const COVID_END = "2021-11-30";
+
+export type CovidWindow = { startIdx: number; endIdx: number; len: number };
+
+export function covidWindow(dates: string[]): CovidWindow {
+  const startIdx = dates.findIndex(d => d >= COVID_START);
+  let endIdx = dates.length - 1;
+  while (endIdx >= 0 && dates[endIdx] > COVID_END) endIdx--;
+  const len = startIdx >= 0 && endIdx >= startIdx ? endIdx - startIdx + 1 : 0;
+  return { startIdx, endIdx, len };
+}
+
+/**
+ * COVID days that still count: a run of >= 10 consecutive visible days anchored
+ * within 7 days of either boundary means the hull was genuinely sailing, so its
+ * whole run stays in the denominator.
+ */
+export function qualifyingCovidIndices(voyageRow: (Cell | null)[], w: CovidWindow): Set<number> {
+  const qualifying = new Set<number>();
+  if (w.len <= 0) return qualifying;
+  let runStart = -1;
+  const flush = (runEnd: number) => {
+    if (runStart < 0) return;
+    const len = runEnd - runStart + 1;
+    const anchored = runStart - w.startIdx <= 7 || w.endIdx - runEnd <= 7;
+    if (len >= 10 && anchored) {
+      for (let i = runStart; i <= runEnd; i++) qualifying.add(i);
+    }
+    runStart = -1;
+  };
+  for (let d = w.startIdx; d <= w.endIdx; d++) {
+    const cell = voyageRow[d];
+    if (cell && cell.v >= 1) {
+      if (runStart < 0) runStart = d;
+    } else {
+      flush(d - 1);
+    }
+  }
+  flush(w.endIdx);
+  return qualifying;
+}
+
+export type Eligibility = {
+  /** Date indices that enter the denominator, ascending. */
+  indices: number[];
+  oosExcluded: number;
+  covidExcluded: number;
+};
+
+/** Eligible day indices for one MMSI row: in service, and not a dead COVID day. */
+export function eligibleDayIndices(
+  row: Row,
+  dates: string[],
+  voyageRow: (Cell | null)[],
+  w: CovidWindow,
+): Eligibility {
+  const qualified = w.len > 0 ? qualifyingCovidIndices(voyageRow, w) : null;
+  const indices: number[] = [];
+  let oosExcluded = 0;
+  let covidExcluded = 0;
+
+  for (let d = 0; d < dates.length; d++) {
+    if (rowIsOutOfService(row, dates[d])) { oosExcluded++; continue; }
+    const cell = voyageRow[d];
+    const hasVisible = Boolean(cell && cell.v >= 1);
+    const inCovid = w.len > 0 && d >= w.startIdx && d <= w.endIdx;
+    if (inCovid && !hasVisible && !qualified?.has(d)) { covidExcluded++; continue; }
+    indices.push(d);
+  }
+
+  return { indices, oosExcluded, covidExcluded };
+}

@@ -5,7 +5,7 @@ import CoverageGrid from "./CoverageGrid";
 import type { CoveragePayload } from "./types";
 import type { ShellMode } from "./CoverageShell";
 
-async function fetchWithRetry(
+export async function fetchWithRetry(
   url: string,
   onProgress: (r: number, t: number | null) => void,
   signal: AbortSignal,

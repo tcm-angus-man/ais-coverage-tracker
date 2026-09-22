@@ -15,7 +15,9 @@ import { useAssignments } from "./AssignmentContext";
 // Imported rather than re-declared so the grid's silver window can't drift
 // from the window the snapshot query actually uses.
 import { SILVER_START } from "@/lib/snapshot/types";
-import { computeSilverKpis, mergedDayOutcome } from "./kpis";
+import { computeSilverKpis, covidWindow, eligibleDayIndices, mergedDayOutcome } from "./kpis";
+import { indexPayload, type Indexed } from "./indexPayload";
+import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM } from "./team";
 import {
   attributedShips,
   buildRows,
@@ -27,7 +29,6 @@ import {
 } from "./rows";
 
 // Cleaners who work live-data — highlighted in the assignee picker
-const LIVE_DATA_TEAM = new Set(["nick", "ai-ai", "kim"]);
 
 // Client-safe db_user_id → display_name lookup (mirrors lib/sheets/team-config.ts,
 // can't import that here because it has "server-only").
@@ -110,91 +111,6 @@ function voyageCellStyle(cell: Cell): VoyageCellStyle | null {
 function silverCellColor(cell: Cell): string | null {
   if (cell.t === 0) return null;
   return (cell.dt + cell.dd + cell.sp + cell.ol) > 0 ? C_SILVER_NR : C_SILVER_OK;
-}
-
-// ---------- indexing ----------
-type LayerMeta = { cells: (Cell | null)[][] };
-
-type Indexed = {
-  payload: CoveragePayload;
-  rows: Row[];
-  dates: string[];
-  silverDates: string[];
-  silverDateOffset: number;
-  voyage: LayerMeta;
-  silver: LayerMeta;
-  /** Row indices that have silver data on at least one member. */
-  silverRowSet: Set<number>;
-  cruiseLineList: string[];
-};
-
-function indexPayload(payload: CoveragePayload): Indexed {
-  const { ships, dates } = payload;
-  const dateIdx = new Map<string, number>();
-  for (let i = 0; i < dates.length; i++) dateIdx.set(dates[i], i);
-
-  // One row per MMSI. The payload stays ship_id-keyed so per-day attribution
-  // survives; merging happens here.
-  const rows = buildRows(ships, payload.voyage_cells);
-
-  const silverShipIds = new Set<number>(Object.keys(payload.silver_cells).map(Number));
-  const silverRowSet = new Set<number>();
-  rows.forEach((row, i) => {
-    if (row.members.some(s => silverShipIds.has(s.id))) silverRowSet.add(i);
-  });
-
-  const buildLayer = (
-    layer: Record<string, Record<string, Cell>>,
-    merge: (cells: (Cell | null)[]) => Cell | null,
-  ): LayerMeta => {
-    const cells: (Cell | null)[][] = [];
-    for (const row of rows) {
-      const arr: (Cell | null)[] = new Array(dates.length).fill(null);
-      const memberRows = row.members
-        .map(s => layer[String(s.id)])
-        .filter((r): r is Record<string, Cell> => Boolean(r));
-      if (memberRows.length === 1) {
-        // Single member — no merge cost on the overwhelmingly common path.
-        for (const d in memberRows[0]) {
-          const i = dateIdx.get(d);
-          if (i !== undefined) arr[i] = memberRows[0][d];
-        }
-      } else if (memberRows.length > 1) {
-        const touched = new Set<number>();
-        for (const m of memberRows) {
-          for (const d in m) {
-            const i = dateIdx.get(d);
-            if (i !== undefined) touched.add(i);
-          }
-        }
-        for (const i of touched) {
-          const d = dates[i];
-          arr[i] = merge(memberRows.map(m => m[d] ?? null));
-        }
-      }
-      cells.push(arr);
-    }
-    return { cells };
-  };
-
-  const silverDateOffset = Math.max(0, dates.findIndex(d => d >= SILVER_START));
-  const silverDates = dates.slice(silverDateOffset);
-
-  const clSet = new Set<string>();
-  for (const s of ships) if (s.cruise_line) clSet.add(s.cruise_line);
-  const cruiseLineList = Array.from(clSet).sort();
-
-  return {
-    payload,
-    rows,
-    dates,
-    silverDates,
-    silverDateOffset,
-    voyage: buildLayer(payload.voyage_cells, mergeVoyageCells),
-    silver: buildLayer(payload.silver_cells, mergeSilverCells),
-    silverRowSet,
-    cruiseLineList,
-  };
 }
 
 // ---------- diagonal split ----------
@@ -569,41 +485,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         inServiceDays: k.inServiceDays,
       };
     } else {
-      // COVID window: days in this range with no legit coverage are excluded from denominator
-      const COVID_START = "2020-03-01";
-      const COVID_END   = "2021-11-30";
-      const covidStartIdx = dates.findIndex(d => d >= COVID_START);
-      const covidEndIdx   = (() => { let i = dates.length - 1; while (i >= 0 && dates[i] > COVID_END) i--; return i; })();
-      const covidWindowLen = (covidStartIdx >= 0 && covidEndIdx >= covidStartIdx) ? covidEndIdx - covidStartIdx + 1 : 0;
-
-      // Per-ship_id COVID qualifying-run days (≥10 consecutive v>=1 days
-      // anchored within 7 days of either COVID boundary).
-      const qualifyingCovidIndices = (si: number): Set<number> => {
-        const qualifying = new Set<number>();
-        if (covidWindowLen <= 0) return qualifying;
-        let runStart = -1;
-        const flush = (runEnd: number) => {
-          if (runStart < 0) return;
-          const len = runEnd - runStart + 1;
-          const anchored =
-            (runStart - covidStartIdx) <= 7 ||
-            (covidEndIdx - runEnd)     <= 7;
-          if (len >= 10 && anchored) {
-            for (let i = runStart; i <= runEnd; i++) qualifying.add(i);
-          }
-          runStart = -1;
-        };
-        for (let d = covidStartIdx; d <= covidEndIdx; d++) {
-          const cell = voyage.cells[si][d];
-          if (cell && cell.v >= 1) {
-            if (runStart < 0) runStart = d;
-          } else {
-            flush(d - 1);
-          }
-        }
-        flush(covidEndIdx);
-        return qualifying;
-      };
+      // Eligibility (service window + COVID) comes from kpis.ts so /gaps
+      // classifies exactly this population. Do not inline it again here.
+      const w = covidWindow(dates);
 
       // Voyage counts per MMSI row. A day inside any member's service window
       // enters the denominator and counts as covered when any member has a
@@ -611,18 +495,12 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
       // many ship records it has.
       let withData = 0, requested = 0, needsReview = 0, missing = 0, covidExcluded = 0, oosExcluded = 0;
       for (const si of baseShipIdx) {
-        const qualifiedCovidIdx = covidWindowLen > 0 ? qualifyingCovidIndices(si) : null;
-        for (let d = 0; d < dates.length; d++) {
-          // Skip days outside every member's [service_start, service_end] window.
-          if (rowIsOutOfService(rows[si], dates[d])) { oosExcluded++; continue; }
+        const e = eligibleDayIndices(rows[si], dates, voyage.cells[si], w);
+        oosExcluded += e.oosExcluded;
+        covidExcluded += e.covidExcluded;
+        for (const d of e.indices) {
           const cell = voyage.cells[si][d];
-          const hasVoyage = cell && cell.t > 0;
-          const hasVisible = cell && cell.v >= 1;
-          // Check if this day falls in COVID window and is not a qualifying run day
-          const inCovid = covidWindowLen > 0 && d >= covidStartIdx && d <= covidEndIdx;
-          const covidExclude = inCovid && !hasVisible && !(qualifiedCovidIdx?.has(d));
-          if (covidExclude) { covidExcluded++; continue; }
-          if (hasVoyage) { requested++; }
+          if (cell && cell.t > 0) { requested++; }
           if (isMerged) {
             // Outer join: the day is done if EITHER layer completed it, so the
             // layers cover each other's gaps and merged >= both single layers.
@@ -631,6 +509,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
             if (outcome === "review") needsReview++;
             continue;
           }
+          const hasVisible = cell && cell.v >= 1;
           if (!hasVisible) { missing++; } else { withData++; }
           if (hasVisible && (cell.dw > cell.v || cell.na > cell.v)) needsReview++;
         }
@@ -1504,22 +1383,6 @@ function SilverTooltip({ cell }: { cell: Cell }) {
   );
 }
 
-// All cleaners — live-data team first, then rest (client-safe, no server-only import needed)
-const ASSIGNABLE_MEMBERS = [
-  { slug: "nick",    display_name: "Nick" },
-  { slug: "ai-ai",  display_name: "Ai-ai" },
-  { slug: "kim",    display_name: "Kim" },
-  { slug: "bea",    display_name: "Bea" },
-  { slug: "ronnel", display_name: "Ronnel" },
-  { slug: "kaye",   display_name: "Kaye" },
-  { slug: "coleen", display_name: "Coleen" },
-  { slug: "nicole", display_name: "Nicole" },
-  { slug: "jayziel",display_name: "Jayziel" },
-  { slug: "rome",   display_name: "Rome" },
-  { slug: "dave",   display_name: "Dave" },
-  { slug: "jen",    display_name: "Jen" },
-  { slug: "jovi",   display_name: "Jovi" },
-];
 
 function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
   ship: Ship; dateStart: string; dateEnd: string;
