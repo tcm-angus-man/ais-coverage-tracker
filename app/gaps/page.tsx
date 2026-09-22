@@ -237,13 +237,13 @@ export default function GapsPage() {
         <div style={{ padding: "8px 36px", fontSize: 11, color: "#d35454" }}>{error}</div>
       )}
 
-      <Section title="High — actionable now" hint="Data exists but is flagged or not visible. This is the cleaning team's queue.">
+      <Section title="High — actionable now" hint="Silver data exists and carries anomaly flags. The team cleans silver, so these are the ship-days that can actually be worked.">
         <RunTable runs={high} canAssign={canAssign} busy={busy} onAssign={assignRun} />
       </Section>
 
       <Section
         title="Blackout — not actionable"
-        hint="Neither layer holds usable data. Tracked so we can quantify true coverage gaps; there is nothing for a cleaner to work here."
+        hint="No silver data for these ship-days, so there is nothing to clean — whether or not a voyage exists. Tracked to quantify true coverage gaps."
         right={
           <button
             onClick={() => setShowBlackout(v => !v)}

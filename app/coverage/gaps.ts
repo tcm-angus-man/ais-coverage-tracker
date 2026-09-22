@@ -26,21 +26,31 @@ export type GapRun = {
 /**
  * Classify one eligible ship-day, reusing the Merged tab's own verdict.
  *
- *   review -> high      data exists but is flagged or not visible; the cleaning
- *                       team can work it. This is the operational focus.
- *   none   -> blackout  neither layer holds anything usable. A real coverage
- *                       gap, but not actionable by the team today.
- *   done   -> null      already covered; not gap work.
+ * A day the Merged tab counts as done is not gap work. Every unresolved day is
+ * then split by the only thing that decides whether the cleaning team can act:
+ * **is there silver data to clean?**
  *
- * High + Blackout is therefore exactly the Merged tab's unresolved population,
- * because `mergedDayOutcome` is the same function the KPI calls. Blackout alone
- * is smaller than the headline unresolved figure — the rest is High.
+ *   silver present -> high      the team can work it. This is the operational
+ *                               focus, and the team cleans silver, not voyages.
+ *   silver absent  -> blackout  nothing to clean. A real coverage gap worth
+ *                               quantifying, but not actionable today.
+ *
+ * Presence of silver is the whole test, because an unresolved day can never
+ * carry CLEAN silver — clean silver makes the day done. So "has silver" and
+ * "has dirty silver" are the same condition here.
+ *
+ * This is why a voyage that exists but is not visible on the globe is NOT High
+ * when the silver layer is empty for that ship-day: the Merged view calls it
+ * unresolved, but there is no silver for a cleaner to touch. Listing it as
+ * actionable put multi-year runs in the queue that nobody could work.
+ *
+ * High + Blackout remains exactly the Merged tab's unresolved population — the
+ * split moved, the total did not.
  */
 export function classifyGapDay(silver: Cell | null, voyage: Cell | null): GapClass | null {
-  const outcome = mergedDayOutcome(silver, voyage);
-  if (outcome === "review") return "high";
-  if (outcome === "none") return "blackout";
-  return null;
+  if (mergedDayOutcome(silver, voyage) === "done") return null;
+  const silverHasData = silver !== null && silver.t > 0;
+  return silverHasData ? "high" : "blackout";
 }
 
 /**

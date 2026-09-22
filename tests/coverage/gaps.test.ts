@@ -16,23 +16,32 @@ const row = (s: Ship): Row => ({ key: `m:${s.mmsi}`, mmsi: s.mmsi, primary: s, m
 const done      = (): Cell => ({ t: 1, v: 1, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 });
 const review    = (): Cell => ({ t: 1, v: 0, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0 });
 const silverBad = (): Cell => ({ t: 900, v: 0, na: 0, dw: 0, np: 0, dt: 4, dd: 0, sp: 0, ol: 0, u: 0 });
+const silverEmpty = (): Cell => ({ t: 0, v: 0, na: 0, dw: 0, np: 0, dt: 0, dd: 0, sp: 0, ol: 0, u: 0 });
 const nothing   = (): null => null;
 
 const days = (n: number, from = 1) =>
   Array.from({ length: n }, (_, i) => `2024-01-${String(from + i).padStart(2, "0")}`);
 
 describe("classifyGapDay", () => {
-  it("maps a review day to High", () => {
-    expect(classifyGapDay(null, review())).toBe("high");
+  // The team cleans silver, so actionable work requires silver data to clean.
+  it("maps an unresolved day WITH silver data to High", () => {
     expect(classifyGapDay(silverBad(), null)).toBe("high");
+    expect(classifyGapDay(silverBad(), review())).toBe("high");
   });
 
-  it("maps a none day to Blackout", () => {
+  it("maps an unresolved day with no silver data to Blackout", () => {
     expect(classifyGapDay(null, null)).toBe("blackout");
   });
 
-  // Blackout must stay smaller than the headline unresolved figure: the rest
-  // of that population is High, not Blackout.
+  // Regression: PIANO LAND surfaced a 1,127-day High run over a period with no
+  // silver layer at all. A voyage that exists but is not visible on the globe
+  // is unresolved in the Merged view, but there is nothing for a cleaner to
+  // touch, so it must not be queued as actionable work.
+  it("does not call a not-visible voyage High when silver is empty", () => {
+    expect(classifyGapDay(null, review())).toBe("blackout");
+    expect(classifyGapDay(silverEmpty(), review())).toBe("blackout");
+  });
+
   it("excludes completed days from the worklist entirely", () => {
     expect(classifyGapDay(null, done())).toBeNull();
     expect(classifyGapDay(silverBad(), done())).toBeNull();
@@ -40,29 +49,33 @@ describe("classifyGapDay", () => {
 });
 
 describe("buildGapRuns", () => {
-  const base = (cells: (Cell | null)[], silver: (Cell | null)[] = []) => ({
+  const base = (cells: (Cell | null)[], silver?: (Cell | null)[]) => ({
     rowIdxs: [0],
     rows: [row(ship())],
     dates: days(cells.length),
     voyageCells: [cells],
-    silverCells: [silver.length ? silver : cells.map(() => null)],
+    silverCells: [silver ?? cells.map(() => null)],
   });
 
   it("merges adjacent days of the same classification into one run", () => {
-    const runs = buildGapRuns(base([review(), review(), review()]));
+    const runs = buildGapRuns(base([review(), review(), review()], [silverBad(), silverBad(), silverBad()]));
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ classification: "high", dateStart: "2024-01-01", dateEnd: "2024-01-03", days: 3 });
   });
 
   it("splits a run when the classification changes", () => {
-    const runs = buildGapRuns(base([review(), review(), nothing(), nothing()]));
+    // Two cleanable days (dirty silver), then two with no silver to clean.
+    const runs = buildGapRuns(base(
+      [review(), review(), nothing(), nothing()],
+      [silverBad(), silverBad(), null, null],
+    ));
     expect(runs).toHaveLength(2);
     expect(runs[0]).toMatchObject({ classification: "high", days: 2 });
     expect(runs[1]).toMatchObject({ classification: "blackout", days: 2, dateStart: "2024-01-03" });
   });
 
   it("splits a run when a completed day interrupts it", () => {
-    const runs = buildGapRuns(base([review(), done(), review()]));
+    const runs = buildGapRuns(base([review(), done(), review()], [silverBad(), null, silverBad()]));
     expect(runs).toHaveLength(2);
     expect(runs.every(r => r.days === 1)).toBe(true);
     expect(runs[1].dateStart).toBe("2024-01-03");
@@ -77,10 +90,10 @@ describe("buildGapRuns", () => {
       rows: [row(s)],
       dates: days(4),
       voyageCells: [[review(), review(), review(), review()]],
-      silverCells: [[null, null, null, null]],
+      silverCells: [[silverBad(), silverBad(), silverBad(), silverBad()]],
     });
     expect(runs).toHaveLength(1);
-    expect(runs[0]).toMatchObject({ dateStart: "2024-01-03", dateEnd: "2024-01-04", days: 2 });
+    expect(runs[0]).toMatchObject({ classification: "high", dateStart: "2024-01-03", dateEnd: "2024-01-04", days: 2 });
   });
 
   // A non-visible COVID day with no qualifying run is excluded from the
@@ -105,7 +118,7 @@ describe("buildGapRuns", () => {
       rows: [row(a), row(b)],
       dates: days(2),
       voyageCells: [[review(), review()], [review(), review()]],
-      silverCells: [[null, null], [null, null]],
+      silverCells: [[silverBad(), silverBad()], [silverBad(), silverBad()]],
     });
     expect(runs).toHaveLength(2);
     expect(runs.map(r => r.mmsi).sort()).toEqual([111, 222]);
@@ -114,7 +127,7 @@ describe("buildGapRuns", () => {
 
   it("splits a run when the assignment identity changes", () => {
     const runs = buildGapRuns({
-      ...base([review(), review(), review(), review()]),
+      ...base([review(), review(), review(), review()], [silverBad(), silverBad(), silverBad(), silverBad()]),
       assignmentAt: (_r, date) => (date <= "2024-01-02" ? "kim|in_progress" : null),
     });
     expect(runs).toHaveLength(2);
@@ -129,9 +142,9 @@ describe("sortGapRuns", () => {
       rowIdxs: [0],
       rows: [row(ship())],
       dates: days(8),
-      //      blackout x2        high x3                          high x1
+      //       blackout x2         high x3 (dirty silver)          high x1
       voyageCells: [[nothing(), nothing(), review(), review(), review(), done(), review(), done()]],
-      silverCells: [Array(8).fill(null)],
+      silverCells: [[null, null, silverBad(), silverBad(), silverBad(), null, silverBad(), null]],
     });
     const sorted = sortGapRuns(runs);
     expect(sorted.map(r => `${r.classification}:${r.days}`)).toEqual(["high:3", "high:1", "blackout:2"]);
@@ -141,12 +154,10 @@ describe("sortGapRuns", () => {
 // The acceptance condition: the worklist must account for exactly the Merged
 // tab's unresolved population — no day dropped by run-building, none counted
 // twice. Merged counts `review` into needsReview and `none` into missing, so
-// unresolved = needsReview + missing.
+// unresolved = needsReview + missing. Requiring silver data for High moved the
+// split between the two bands; it must not have changed the total.
 describe("reconciliation with the Merged unresolved population", () => {
-  it("High days + Blackout days equal merged needsReview + missing", () => {
-    // Ascending, as the real payload's `dates` always is — covidWindow scans
-    // from the front, so an out-of-order array makes the whole range look like
-    // the COVID window and excludes everything.
+  it("High days + Blackout days equal the merged unresolved total", () => {
     const dates = ["2020-06-01", "2020-06-02", "2021-05-05", ...days(28)];
     const ships = [
       ship({ id: 1, mmsi: 111, display_name: "Alpha" }),
@@ -162,32 +173,46 @@ describe("reconciliation with the Merged unresolved population", () => {
     };
     const voyageCells = ships.map((_, s) => dates.map((_, i) => pick(i, s)));
     const silverCells = ships.map((_, s) => dates.map((_, i) => ((i + s) % 4 === 0 ? silverBad() : null)));
-
     const rowIdxs = [0, 1, 2];
 
     // Merged KPI's own counting, over the same eligible set.
     const w = covidWindow(dates);
-    let needsReview = 0, missing = 0, withData = 0;
+    let unresolved = 0, withSilver = 0, withoutSilver = 0;
     for (const si of rowIdxs) {
       const { indices } = eligibleDayIndices(rows[si], dates, voyageCells[si], w);
       for (const d of indices) {
-        const outcome = mergedDayOutcome(silverCells[si][d], voyageCells[si][d]);
-        if (outcome === "none") missing++; else withData++;
-        if (outcome === "review") needsReview++;
+        if (mergedDayOutcome(silverCells[si][d], voyageCells[si][d]) === "done") continue;
+        unresolved++;
+        const sc = silverCells[si][d];
+        if (sc && sc.t > 0) withSilver++; else withoutSilver++;
       }
     }
-    const unresolved = needsReview + missing;
 
-    const totals = gapTotals(buildGapRuns({ rowIdxs, rows, dates, voyageCells, silverCells }));
+    const runs = buildGapRuns({ rowIdxs, rows, dates, voyageCells, silverCells });
+    const totals = gapTotals(runs);
 
-    expect(totals.highDays).toBe(needsReview);
-    expect(totals.blackoutDays).toBe(missing);
     expect(totals.highDays + totals.blackoutDays).toBe(unresolved);
-    // Guard against a degenerate fixture that would pass trivially.
-    expect(unresolved).toBeGreaterThan(0);
-    expect(withData).toBeGreaterThan(0);
-    // Blackout alone must be smaller than the unresolved figure.
-    expect(totals.blackoutDays).toBeLessThan(unresolved);
+    expect(totals.highDays).toBe(withSilver);
+    expect(totals.blackoutDays).toBe(withoutSilver);
+
+    // Guard against a fixture that would pass trivially.
+    expect(withSilver).toBeGreaterThan(0);
+    expect(withoutSilver).toBeGreaterThan(0);
+  });
+
+  // The bug in one assertion: nothing in the actionable band may lack silver.
+  it("never puts a day with no silver data into High", () => {
+    const dates = days(20);
+    const rows = [row(ship())];
+    // Every day has a voyage that is requested but not visible, and no silver.
+    const voyageCells = [dates.map(() => review())];
+    const silverCells = [dates.map(() => null)];
+
+    const runs = buildGapRuns({ rowIdxs: [0], rows, dates, voyageCells, silverCells });
+
+    expect(runs.every(r => r.classification === "blackout")).toBe(true);
+    expect(gapTotals(runs).highDays).toBe(0);
+    expect(gapTotals(runs).blackoutDays).toBe(20);
   });
 });
 
@@ -232,7 +257,7 @@ describe("date range", () => {
     rows: [row(ship())],
     dates: days(10),
     voyageCells: [Array(10).fill(null).map(() => review())],
-    silverCells: [Array(10).fill(null)],
+    silverCells: [Array(10).fill(null).map(() => silverBad())],
   });
 
   // Clipping, not overlap-filtering: an assignment created from a visible run
