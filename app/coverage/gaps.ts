@@ -43,6 +43,25 @@ export function classifyGapDay(silver: Cell | null, voyage: Cell | null): GapCla
   return null;
 }
 
+/**
+ * Free-text ship match for the worklist filter: name, cruise line, IMO or MMSI.
+ *
+ * Matches against every member of the row, not just the primary, so searching a
+ * hull's former name still finds it — the row is an MMSI, and a renamed or
+ * resold hull keeps several ship records under it.
+ */
+export function matchesShipQuery(row: Row, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (String(row.mmsi).includes(q)) return true;
+  return row.members.some(s =>
+    s.display_name.toLowerCase().includes(q) ||
+    s.name.toLowerCase().includes(q) ||
+    s.cruise_line.toLowerCase().includes(q) ||
+    s.imo_number.toLowerCase().includes(q) ||
+    String(s.mmsi).includes(q));
+}
+
 export type BuildGapRunsArgs = {
   rowIdxs: number[];
   rows: Row[];
@@ -54,6 +73,13 @@ export type BuildGapRunsArgs = {
    * changes so an assigned stretch never merges with an unassigned one.
    */
   assignmentAt?: (rowIdx: number, date: string) => string | null;
+  /**
+   * Inclusive YYYY-MM-DD bounds. Applied to eligible DAYS before runs are
+   * built, so runs clip to the window instead of spilling past it — what you
+   * see is what an assignment covers.
+   */
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 /**
@@ -66,14 +92,17 @@ export type BuildGapRunsArgs = {
  * period we deliberately do not count.
  */
 export function buildGapRuns(args: BuildGapRunsArgs): GapRun[] {
-  const { rowIdxs, rows, dates, voyageCells, silverCells, assignmentAt } = args;
+  const { rowIdxs, rows, dates, voyageCells, silverCells, assignmentAt, dateFrom, dateTo } = args;
   const w = covidWindow(dates);
   const runs: GapRun[] = [];
 
   for (const si of rowIdxs) {
     const row = rows[si];
     if (!row) continue;
-    const { indices } = eligibleDayIndices(row, dates, voyageCells[si], w);
+    const all = eligibleDayIndices(row, dates, voyageCells[si], w).indices;
+    const indices = (dateFrom || dateTo)
+      ? all.filter(d => (!dateFrom || dates[d] >= dateFrom) && (!dateTo || dates[d] <= dateTo))
+      : all;
 
     let open: GapRun | null = null;
     let openIdx = -1;

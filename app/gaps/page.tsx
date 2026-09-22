@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentContext";
 import { fetchWithRetry } from "@/app/coverage/CoverageLoader";
 import { indexPayload } from "@/app/coverage/indexPayload";
-import { buildGapRuns, gapTotals, sortGapRuns, type GapRun } from "@/app/coverage/gaps";
+import { buildGapRuns, gapTotals, matchesShipQuery, sortGapRuns, type GapRun } from "@/app/coverage/gaps";
 import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM } from "@/app/coverage/team";
 import type { CoveragePayload } from "@/app/coverage/types";
 
@@ -20,6 +20,11 @@ const C_ACCENT    = "#e8c170";
 const C_HIGH      = "#e8c170";
 const C_BLACKOUT  = "#5a6d7c";
 
+const dateStyle: React.CSSProperties = {
+  background: C_PANEL, color: C_INK, border: `1px solid ${C_LINE}`,
+  borderRadius: 2, padding: "3px 7px", fontSize: 11, fontFamily: "inherit",
+};
+
 export default function GapsPage() {
   const { data: session } = useSession();
   const { drafts, addDraft } = useAssignments();
@@ -30,6 +35,10 @@ export default function GapsPage() {
   const [showBlackout, setShowBlackout] = useState(false);
   const [assignee, setAssignee] = useState<string>("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [tiers, setTiers] = useState<Set<1 | 2 | 3 | 4>>(new Set());
+  const [query, setQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const canAssign = session?.user?.role === "assigner" || session?.user?.can_assign === true;
 
@@ -74,13 +83,24 @@ export default function GapsPage() {
 
   const { high, blackout, totals } = useMemo(() => {
     if (!indexed) return { high: [] as GapRun[], blackout: [] as GapRun[], totals: null };
+    // Tier and search narrow the ships; the date range narrows the days. Both
+    // are applied before runs are built, so the totals below describe exactly
+    // what is listed.
+    const rowIdxs: number[] = [];
+    indexed.rows.forEach((row, i) => {
+      if (tiers.size > 0 && !row.members.some(m => tiers.has(m.tier))) return;
+      if (!matchesShipQuery(row, query)) return;
+      rowIdxs.push(i);
+    });
     const runs = sortGapRuns(buildGapRuns({
-      rowIdxs: indexed.rows.map((_, i) => i),
+      rowIdxs,
       rows: indexed.rows,
       dates: indexed.dates,
       voyageCells: indexed.voyage.cells,
       silverCells: indexed.silver.cells,
       assignmentAt,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
     }));
     const t = gapTotals(runs);
     const visible = (r: GapRun) =>
@@ -91,7 +111,7 @@ export default function GapsPage() {
       blackout: runs.filter(r => r.classification === "blackout"),
       totals: t,
     };
-  }, [indexed, assignmentAt, unassignedOnly, assignee]);
+  }, [indexed, assignmentAt, unassignedOnly, assignee, tiers, query, dateFrom, dateTo]);
 
   const assigneeList = useMemo(() => {
     const s = new Set<string>();
@@ -136,6 +156,8 @@ export default function GapsPage() {
     }
   }
 
+  const filtered = query.trim() !== "" || tiers.size > 0 || dateFrom !== "" || dateTo !== "";
+
   if (error && !payload) return <Centered>Failed to load: {error}</Centered>;
   if (!indexed || !totals) return <Centered>Loading coverage data…</Centered>;
 
@@ -149,8 +171,47 @@ export default function GapsPage() {
           Gaps <em style={{ fontStyle: "italic", fontWeight: 300, color: C_ACCENT }}>to clear</em>
         </h1>
         <p style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontWeight: 300, fontSize: 12, color: C_INK_DIM, margin: 0 }}>
-          High and Blackout together are the Merged tab&apos;s unresolved population.
+          {filtered
+            ? "Filtered view — totals describe the current filters, not the whole fleet."
+            : "High and Blackout together are the Merged tab\u2019s unresolved population."}
         </p>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="ship, cruise line, IMO or MMSI"
+            style={{ flex: "1 1 240px", maxWidth: 320, background: C_PANEL, color: C_INK, border: `1px solid ${C_LINE}`, borderRadius: 2, padding: "4px 9px", fontSize: 11, fontFamily: "inherit" }}
+          />
+          <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+            <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginRight: 4 }}>tier</span>
+            {([1, 2, 3, 4] as const).map(t => {
+              const on = tiers.has(t);
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTiers(prev => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; })}
+                  style={{ padding: "3px 9px", fontSize: 10, cursor: "pointer", borderRadius: 2, fontFamily: "inherit", fontWeight: on ? 600 : 400, border: `1px solid ${on ? C_ACCENT : C_LINE}`, background: on ? C_ACCENT : "transparent", color: on ? "#1a1207" : C_INK_FAINT }}
+                >
+                  T{t}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 11, color: C_INK_FAINT }}>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={dateStyle} />
+            <span>→</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={dateStyle} />
+          </div>
+          {filtered && (
+            <button
+              onClick={() => { setQuery(""); setTiers(new Set()); setDateFrom(""); setDateTo(""); }}
+              style={{ padding: "3px 10px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer", borderRadius: 2, border: `1px solid ${C_LINE}`, background: "transparent", color: C_INK_DIM, fontFamily: "inherit" }}
+            >
+              clear
+            </button>
+          )}
+        </div>
 
         <div style={{ display: "flex", gap: 28, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
           <Stat value={totals.highDays.toLocaleString()} label={`high days · ${totals.highRuns.toLocaleString()} runs`} color={C_HIGH} />

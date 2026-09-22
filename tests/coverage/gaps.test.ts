@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGapRuns, classifyGapDay, gapTotals, sortGapRuns } from "../../app/coverage/gaps";
+import { buildGapRuns, classifyGapDay, gapTotals, matchesShipQuery, sortGapRuns } from "../../app/coverage/gaps";
 import { covidWindow, eligibleDayIndices, mergedDayOutcome } from "../../app/coverage/kpis";
 import type { Row } from "../../app/coverage/rows";
 import type { Cell, Ship } from "../../app/coverage/types";
@@ -188,5 +188,71 @@ describe("reconciliation with the Merged unresolved population", () => {
     expect(withData).toBeGreaterThan(0);
     // Blackout alone must be smaller than the unresolved figure.
     expect(totals.blackoutDays).toBeLessThan(unresolved);
+  });
+});
+
+describe("matchesShipQuery", () => {
+  const multi = (): Row => {
+    const now = ship({ id: 2, mmsi: 311042900, display_name: "Villa Vie Odyssey", name: "VILLA VIE ODYSSEY", cruise_line: "Villa Vie", imo_number: "9210218" });
+    const was = ship({ id: 3, mmsi: 311042900, display_name: "Braemar", name: "BRAEMAR", cruise_line: "Fred Olsen", imo_number: "9210218" });
+    return { key: "m:311042900", mmsi: 311042900, primary: now, members: [now, was] };
+  };
+
+  it("matches on ship name, case-insensitively and on partials", () => {
+    expect(matchesShipQuery(multi(), "villa")).toBe(true);
+    expect(matchesShipQuery(multi(), "ODYSSEY")).toBe(true);
+    expect(matchesShipQuery(multi(), "zzz")).toBe(false);
+  });
+
+  it("matches on cruise line", () => {
+    expect(matchesShipQuery(multi(), "fred olsen")).toBe(true);
+  });
+
+  it("matches on IMO and MMSI", () => {
+    expect(matchesShipQuery(multi(), "9210218")).toBe(true);
+    expect(matchesShipQuery(multi(), "311042900")).toBe(true);
+    expect(matchesShipQuery(multi(), "3110429")).toBe(true);
+  });
+
+  // The row is an MMSI, so a hull's former name must still find it — otherwise
+  // searching a resold ship by the name on an old assignment returns nothing.
+  it("matches a former name on a shared-MMSI row", () => {
+    expect(matchesShipQuery(multi(), "braemar")).toBe(true);
+  });
+
+  it("treats an empty or whitespace query as no filter", () => {
+    expect(matchesShipQuery(multi(), "")).toBe(true);
+    expect(matchesShipQuery(multi(), "   ")).toBe(true);
+  });
+});
+
+describe("date range", () => {
+  const args = () => ({
+    rowIdxs: [0],
+    rows: [row(ship())],
+    dates: days(10),
+    voyageCells: [Array(10).fill(null).map(() => review())],
+    silverCells: [Array(10).fill(null)],
+  });
+
+  // Clipping, not overlap-filtering: an assignment created from a visible run
+  // must cover exactly the days shown, never days outside the chosen window.
+  it("clips runs to the window rather than returning whole overlapping runs", () => {
+    const runs = buildGapRuns({ ...args(), dateFrom: "2024-01-03", dateTo: "2024-01-05" });
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ dateStart: "2024-01-03", dateEnd: "2024-01-05", days: 3 });
+  });
+
+  it("accepts an open-ended range on either side", () => {
+    expect(buildGapRuns({ ...args(), dateFrom: "2024-01-08" })[0]).toMatchObject({ dateStart: "2024-01-08", days: 3 });
+    expect(buildGapRuns({ ...args(), dateTo: "2024-01-02" })[0]).toMatchObject({ dateEnd: "2024-01-02", days: 2 });
+  });
+
+  it("returns nothing when the window excludes every eligible day", () => {
+    expect(buildGapRuns({ ...args(), dateFrom: "2025-01-01" })).toHaveLength(0);
+  });
+
+  it("is a no-op when no bounds are given", () => {
+    expect(buildGapRuns(args())[0].days).toBe(10);
   });
 });
