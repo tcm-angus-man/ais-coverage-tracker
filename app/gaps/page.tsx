@@ -6,7 +6,7 @@ import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentC
 import { fetchWithRetry } from "@/app/coverage/CoverageLoader";
 import { indexPayload } from "@/app/coverage/indexPayload";
 import {
-  actionsFor, buildAssignmentIndex, buildGapRuns, confirmText, gapTotals, inView, matchesShipQuery, runState,
+  actionsFor, buildAssignmentIndex, buildGapRuns, confirmText, gapProgress, gapTotals, inView, matchesShipQuery, runState,
   snapshotAsOf, sortGapRuns, visibleDays, type GapRun, type GapView, type RunAction,
 } from "@/app/coverage/gaps";
 import { computeSilverKpis, type SilverKpis } from "@/app/coverage/kpis";
@@ -89,9 +89,8 @@ export default function GapsPage() {
       dateTo: dateTo || undefined,
     }));
     const t = gapTotals(runs);
-    // The Cleanliness tab's own calculation, narrowed by the same filters — one
-    // cleanliness definition across the product. It is not the High queue: a
-    // dirty silver day under a visible voyage is done in Merged, so never High.
+    // Silver days with data, narrowed by the same filters as the runs above, so
+    // the Overall progress tile (gapProgress) divides High by one population.
     const { dates } = indexed;
     let from = 0, to = dates.length - 1;
     if (dateFrom) { from = dates.findIndex(d => d >= dateFrom); if (from < 0) from = dates.length; }
@@ -190,6 +189,7 @@ export default function GapsPage() {
 
   if (error && !payload) return <Centered>Failed to load: {error}</Centered>;
   if (!indexed || !totals || !silver) return <Centered>Loading coverage data…</Centered>;
+  const progress = gapProgress(silver, totals);
 
   return (
     <div style={{ height: "100%", overflow: "auto", background: C_BG, color: C_INK }}>
@@ -246,8 +246,8 @@ export default function GapsPage() {
         <div style={{ display: "flex", gap: 28, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
           <Stat value={totals.highDays.toLocaleString()} label={`high days · ${totals.highRuns.toLocaleString()} runs`} color={C_HIGH} />
           <Stat value={totals.blackoutDays.toLocaleString()} label={`blackout days · ${totals.blackoutRuns.toLocaleString()} runs`} color={C_BLACKOUT} />
-          <div style={{ paddingLeft: 28, borderLeft: `1px solid ${C_LINE}` }} title="Same figure as the Cleanliness tab: silver ship-days with all four anomaly counts at zero. Not the High queue.">
-            <Stat value={`${silver.cleanedPct}%`} label={`silver cleanliness · ${(silver.withData - silver.needsReview).toLocaleString()} of ${silver.withData.toLocaleString()} ship-days clean`} color={C_SILVER} />
+          <div style={{ paddingLeft: 28, borderLeft: `1px solid ${C_LINE}` }} title="Silver ship-days with data that are no longer High work, under the same filters as the tables below. Not the Cleanliness tab's figure.">
+            <Stat value={`${progress.pct}%`} label={`overall progress · ${progress.completed.toLocaleString()} of ${progress.total.toLocaleString()} ship-days complete`} color={C_SILVER} />
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "center", fontSize: 11 }}>
             <div style={{ display: "flex", gap: 3 }}>

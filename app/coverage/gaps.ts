@@ -1,6 +1,6 @@
 import type { Cell } from "./types";
 import type { Row } from "./rows";
-import { covidWindow, eligibleDayIndices, mergedDayOutcome } from "./kpis";
+import { covidWindow, eligibleDayIndices, mergedDayOutcome, type SilverKpis } from "./kpis";
 
 // The /gaps worklist. Phase 1 covers the two classifications derivable from the
 // snapshot as it stands; `nc` / Low (voyage-visible but never manually checked)
@@ -335,4 +335,21 @@ export function gapTotals(runs: GapRun[]): GapTotals {
     else { blackoutDays += r.days; blackoutRuns++; }
   }
   return { highDays, blackoutDays, highRuns, blackoutRuns };
+}
+
+export type GapProgress = { total: number; completed: number; pct: number };
+
+/**
+ * The /gaps "Overall progress" tile: of the silver ship-days we hold data for,
+ * how many are no longer actionable work. High is what remains, and every High
+ * day carries silver data, so High is a subset of withData and each day counts
+ * once. Pass both from the same filtered population (tier, search, dates).
+ * Not the Cleanliness tab's figure: a dirty silver day already covered by a
+ * visible voyage, or outside the eligible window, counts as complete here.
+ */
+export function gapProgress(silver: Pick<SilverKpis, "withData">, totals: Pick<GapTotals, "highDays">): GapProgress {
+  const total = silver.withData;
+  const completed = total - totals.highDays;
+  const pct = total === 0 ? 0 : Math.round((completed / total) * 1000) / 10;
+  return { total, completed, pct };
 }

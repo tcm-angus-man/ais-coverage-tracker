@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionsFor, buildAssignmentIndex, buildGapRuns, classifyGapDay, confirmText, gapTotals, inView,
+  actionsFor, buildAssignmentIndex, buildGapRuns, classifyGapDay, confirmText, gapProgress, gapTotals, inView,
   matchesShipQuery, ownsDays, runState, snapshotAsOf, sortGapRuns, spanDays, visibleDays,
   type AssignmentLike, type AssignmentRef, type GapRun,
 } from "../../app/coverage/gaps";
@@ -502,5 +502,32 @@ describe("full-assignment confirmation", () => {
     expect(confirmText({
       verb: "Reassign", ref: ref({ dateStart: "2024-01-01", dateEnd: "2024-06-30" }), visible: 41, detail: "from Nick to Kim",
     })).toBe("Reassign 2024-01-01 → 2024-06-30 (182 days) from Nick to Kim? 41 of those days are in this view.");
+  });
+});
+
+describe("gapProgress", () => {
+  // The /gaps "Overall progress" tile. Of the silver ship-days we hold data
+  // for, how many are no longer actionable work? High is the remaining work,
+  // and every High day carries silver data, so High is a subset of withData.
+  it("is completed = days with data minus High, over days with data", () => {
+    expect(gapProgress({ withData: 1_088_908 }, { highDays: 293_183 })).toEqual({
+      total: 1_088_908, completed: 795_725, pct: 73.1,
+    });
+  });
+
+  // needsReview is a subset of withData. Adding it to the total counted every
+  // dirty day twice and reported more completed days than exist.
+  it("never reports more completed days than days with data", () => {
+    const p = gapProgress({ withData: 1_000 }, { highDays: 0 });
+    expect(p.completed).toBe(1_000);
+    expect(p.pct).toBe(100);
+  });
+
+  it("is 0% when every day with data is still High", () => {
+    expect(gapProgress({ withData: 500 }, { highDays: 500 }).pct).toBe(0);
+  });
+
+  it("is 0% rather than NaN when the filters leave no data", () => {
+    expect(gapProgress({ withData: 0 }, { highDays: 0 })).toEqual({ total: 0, completed: 0, pct: 0 });
   });
 });
