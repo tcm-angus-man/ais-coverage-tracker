@@ -34,6 +34,8 @@ async function fetchShipMetadataSafe(): Promise<ShipMetadata[]> {
 }
 
 export async function buildSnapshot(): Promise<BuildResult> {
+  // Stamped before any query reads Postgres — see CoveragePayload.data_as_of.
+  const data_as_of = new Date().toISOString();
   const pool = getPool();
 
   const [ships, voyageRows, silverRows, metadata] = await Promise.all([
@@ -109,6 +111,7 @@ export async function buildSnapshot(): Promise<BuildResult> {
   const generated_at = new Date().toISOString();
   const payload: CoveragePayload = {
     generated_at,
+    data_as_of,
     date_range: { start: VOYAGE_START, end: dates[dates.length - 1] },
     ships: ships.map((s) => {
       const meta = metaForShip(s);

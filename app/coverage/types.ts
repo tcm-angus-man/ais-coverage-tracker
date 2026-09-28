@@ -32,6 +32,12 @@ export type Cell = {
 
 export type CoveragePayload = {
   generated_at: string;
+  /**
+   * When the snapshot queries started reading Postgres. /gaps compares
+   * assignment completion against this, not generated_at (stamped after the
+   * queries finish). Absent on snapshots written before 2026-09-28.
+   */
+  data_as_of?: string;
   date_range: { start: string; end: string };
   ships: Ship[];
   dates: string[];
