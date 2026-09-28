@@ -120,6 +120,18 @@ describe("PATCH — completed_at is owned by the server", () => {
     expect(cell(written(), "completed_at")).toBe(NOW);
   });
 
+  // Review focus 5 on the write path: a blank status cell is queued, so
+  // completing it is a transition INTO done and must stamp — otherwise the row
+  // would read as a legacy done and its days would fall back into Unassigned.
+  it("stamps completed_at when a blank-status row is marked done", async () => {
+    givenRow(rowOf({ status: "", completed_at: "" }));
+    const { status, json } = await call({ status: "done" });
+    expect(status).toBe(200);
+    expect(cell(written(), "status")).toBe("done");
+    expect(cell(written(), "completed_at")).toBe(NOW);
+    expect(json.updated).toMatchObject({ status: "done", completed_at: NOW });
+  });
+
   // Review focus 1: rows written before column O existed have 14 cells.
   it("pads a legacy 14-cell row and writes all 15 columns", async () => {
     givenRow(rowOf({ status: "done" }).slice(0, 14));
@@ -138,6 +150,18 @@ describe("PATCH — cancel and audit", () => {
     expect(cell(written(), "notes")).toBe(
       `[mon @ 2026-09-01T00:00:00.000Z]\nstart with Q1\n\n[bea @ ${NOW}]\ncancelled`,
     );
+  });
+
+  // Notes are append-only history: cancelling must not lose what was there,
+  // and the audit row must show the notes as they were before the cancel.
+  it("cancelling a noted assignment preserves its notes and audits the original", async () => {
+    const original = "[mon @ 2026-09-01T00:00:00.000Z]\nstart with Q1\n\n[nick @ 2026-09-02T00:00:00.000Z]\nhalfway";
+    givenRow(rowOf({ notes: original }));
+    await call({ status: "cancelled" });
+    const expected = `${original}\n\n[bea @ ${NOW}]\ncancelled`;
+    expect(cell(written(), "notes")).toBe(expected);
+    expect(JSON.parse(audit()[5])).toEqual({ status: "queued", notes: original });
+    expect(JSON.parse(audit()[6])).toEqual({ status: "cancelled", notes: expected });
   });
 
   // Review focus 4: notes edit + cancel in one request.

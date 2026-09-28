@@ -67,8 +67,8 @@ export default function GapsPage() {
     [indexed, drafts],
   );
 
-  const { runs, high, blackout, totals, silver } = useMemo(() => {
-    if (!indexed) return { runs: [] as GapRun[], high: [] as GapRun[], blackout: [] as GapRun[], totals: null, silver: null as SilverKpis | null };
+  const { high, blackout, totals, silver } = useMemo(() => {
+    if (!indexed) return { high: [] as GapRun[], blackout: [] as GapRun[], totals: null, silver: null as SilverKpis | null };
     // Tier and search narrow the ships; the date range narrows the days. Both
     // are applied before runs are built, so the totals below describe exactly
     // what is listed.
@@ -101,7 +101,6 @@ export default function GapsPage() {
       inView(r, runState(r, dataAsOf), view, mySlug) &&
       (view !== "all" || !assignee || r.assignment?.assignee === assignee);
     return {
-      runs,
       high: runs.filter(r => r.classification === "high" && visible(r)),
       blackout: runs.filter(r => r.classification === "blackout"),
       totals: t,
@@ -164,7 +163,10 @@ export default function GapsPage() {
       action === "reopen"         ? { verb: "Reopen", patch: { status: "in_progress" } } :
       null;
     if (!plan) return;
-    if (!window.confirm(confirmText({ verb: plan.verb, ref: a, visible: visibleDays(a.id, runs), detail: plan.detail }))) return;
+    // "In this view" = the rows on screen: the view-filtered High table, plus
+    // Blackout only while that section is expanded.
+    const onScreen = showBlackout ? [...high, ...blackout] : high;
+    if (!window.confirm(confirmText({ verb: plan.verb, ref: a, visible: visibleDays(a.id, onScreen), detail: plan.detail }))) return;
     setBusy(a.id);
     try {
       const r = await fetch(`/api/sheets/assignments/${a.id}`, {
