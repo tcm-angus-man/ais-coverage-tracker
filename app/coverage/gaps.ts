@@ -26,9 +26,155 @@ export type GapRun = {
   dateEnd: string;
   days: number;
   classification: GapClass;
-  /** Assignment identity this run sits under, or null when unassigned. */
-  assignmentKey: string | null;
+  /** The assignment owning this run's days, or null when unassigned. */
+  assignment: AssignmentRef | null;
 };
+
+export type AssignmentRef = {
+  id: string;
+  assignee: string;
+  status: string;
+  /** Server-stamped completion time; blank unless status is a new-flow `done`. */
+  completedAt: string;
+  dateStart: string;
+  dateEnd: string;
+};
+
+/** The assignment fields the index reads. DraftAssignment satisfies it. */
+export type AssignmentLike = {
+  id: string;
+  ship_id: number;
+  ship_mmsi: number;
+  date_start: string;
+  date_end: string;
+  assignee?: string;
+  status?: string;
+  completed_at?: string;
+};
+
+/**
+ * Whether an assignment claims its days on /gaps. Cancelled ones were
+ * withdrawn. Legacy `done` rows (blank completed_at) are grandfathered: they
+ * keep the pre-lifecycle behaviour of not owning their days, so their
+ * still-dirty days stay in the Unassigned queue instead of all reopening at
+ * launch. An empty status cell reads as "", which means queued.
+ */
+export function ownsDays(a: Pick<AssignmentLike, "status" | "completed_at">): boolean {
+  const status = a.status || "queued";
+  if (status === "cancelled") return false;
+  if (status === "done" && !a.completed_at) return false;
+  return true;
+}
+
+/**
+ * Ship-day -> owning assignment. Overlapping assignments on one day: the
+ * first in sheet order wins. Overlap is a data smell, not a feature.
+ */
+export function buildAssignmentIndex(
+  rows: Row[],
+  assignments: AssignmentLike[],
+): (rowIdx: number, date: string) => AssignmentRef | null {
+  const rowIdxByShipId = new Map<number, number>();
+  const rowIdxByMmsi = new Map<number, number>();
+  rows.forEach((row, i) => {
+    for (const m of row.members) rowIdxByShipId.set(m.id, i);
+    if (row.mmsi > 0 && !rowIdxByMmsi.has(row.mmsi)) rowIdxByMmsi.set(row.mmsi, i);
+  });
+
+  const byRow = new Map<number, AssignmentRef[]>();
+  for (const a of assignments) {
+    if (!a.date_start || !a.date_end || !ownsDays(a)) continue;
+    // ship_id is authoritative; legacy rows carry 0 and resolve by MMSI.
+    const ri = a.ship_id ? rowIdxByShipId.get(a.ship_id) : (a.ship_mmsi ? rowIdxByMmsi.get(a.ship_mmsi) : undefined);
+    if (ri === undefined) continue;
+    const list = byRow.get(ri) ?? [];
+    list.push({
+      id: a.id,
+      assignee: a.assignee ?? "",
+      status: a.status || "queued",
+      completedAt: a.completed_at ?? "",
+      dateStart: a.date_start,
+      dateEnd: a.date_end,
+    });
+    byRow.set(ri, list);
+  }
+
+  return (rowIdx, date) => {
+    for (const r of byRow.get(rowIdx) ?? []) if (date >= r.dateStart && date <= r.dateEnd) return r;
+    return null;
+  };
+}
+
+export type RunState = "unassigned" | "active" | "awaiting_snapshot" | "reopened" | "done";
+
+/**
+ * Derived lifecycle state — never persisted. `reopened` is an observation,
+ * not a verdict: a snapshot that read Postgres after completion still shows
+ * the day dirty. It says nothing about why (the fix may not have landed, or
+ * ais_silver_summary may refresh behind the cron — that cadence is external
+ * and unknown). High only: Blackout has no silver, so it is `done`.
+ */
+export function runState(run: Pick<GapRun, "assignment" | "classification">, dataAsOf: string): RunState {
+  const a = run.assignment;
+  if (!a) return "unassigned";
+  if (a.status !== "done") return "active";
+  // An unparseable completed_at (Sheets reformatting) compares as older.
+  const completed = Date.parse(a.completedAt);
+  if (!Number.isNaN(completed) && completed > Date.parse(dataAsOf)) return "awaiting_snapshot";
+  return run.classification === "high" ? "reopened" : "done";
+}
+
+/** The snapshot's data time: data_as_of, or generated_at on older snapshots. */
+export function snapshotAsOf(p: { data_as_of?: string; generated_at: string }): string {
+  return p.data_as_of || p.generated_at;
+}
+
+export type GapView = "unassigned" | "mine" | "reopened" | "all";
+
+export function inView(run: Pick<GapRun, "assignment">, state: RunState, view: GapView, mySlug: string): boolean {
+  switch (view) {
+    case "unassigned": return state === "unassigned";
+    case "mine":       return mySlug !== "" && run.assignment?.assignee === mySlug;
+    case "reopened":   return state === "reopened";
+    case "all":        return true;
+  }
+}
+
+export type RunAction = "assign" | "reassign" | "unassign" | "complete" | "reopen";
+
+/** The spec's per-state action table. Every team member gets the same actions. */
+export function actionsFor(state: RunState): RunAction[] {
+  switch (state) {
+    case "unassigned":        return ["assign"];
+    case "active":            return ["reassign", "unassign", "complete"];
+    case "awaiting_snapshot": return ["reassign", "unassign", "reopen"];
+    case "reopened":          return ["reassign", "unassign", "reopen"];
+    case "done":              return ["reopen"];
+  }
+}
+
+/** Inclusive day count of an assignment's full range. */
+export function spanDays(ref: Pick<AssignmentRef, "dateStart" | "dateEnd">): number {
+  const ms = Date.parse(`${ref.dateEnd}T00:00:00Z`) - Date.parse(`${ref.dateStart}T00:00:00Z`);
+  return Math.round(ms / 86_400_000) + 1;
+}
+
+/** Days of one assignment that appear in the given runs (the current view). */
+export function visibleDays(assignmentId: string, runs: GapRun[]): number {
+  let n = 0;
+  for (const r of runs) if (r.assignment?.id === assignmentId) n += r.days;
+  return n;
+}
+
+/**
+ * Confirmation for an action. Actions change the WHOLE assignment, and the
+ * visible run is often only part of it (date filter, already-clean days,
+ * ineligible days, a High/Blackout split), so the text states the full range.
+ */
+export function confirmText(a: { verb: string; ref: AssignmentRef; visible: number; detail?: string }): string {
+  const range = `${a.ref.dateStart} → ${a.ref.dateEnd} (${spanDays(a.ref)} days)`;
+  return `${a.verb} ${range}${a.detail ? ` ${a.detail}` : ""}? ${a.visible} of those days are in this view.`;
+}
 
 /**
  * Classify one eligible ship-day, reusing the Merged tab's own verdict.
@@ -89,7 +235,7 @@ export type BuildGapRunsArgs = {
    * Assignment identity covering a ship-day, or null. Runs break when this
    * changes so an assigned stretch never merges with an unassigned one.
    */
-  assignmentAt?: (rowIdx: number, date: string) => string | null;
+  assignmentAt?: (rowIdx: number, date: string) => AssignmentRef | null;
   /**
    * Inclusive YYYY-MM-DD bounds. Applied to eligible DAYS before runs are
    * built, so runs clip to the window instead of spilling past it — what you
@@ -127,13 +273,13 @@ export function buildGapRuns(args: BuildGapRunsArgs): GapRun[] {
     for (const d of indices) {
       const cls = classifyGapDay(silverCells[si][d], voyageCells[si][d]);
       const date = dates[d];
-      const key = cls === null ? null : (assignmentAt?.(si, date) ?? null);
+      const ref = cls === null ? null : (assignmentAt?.(si, date) ?? null);
 
       const continues =
         open !== null &&
         cls !== null &&
         open.classification === cls &&
-        open.assignmentKey === key &&
+        (open.assignment?.id ?? null) === (ref?.id ?? null) &&
         d === openIdx + 1;
 
       if (continues && open) {
@@ -157,7 +303,7 @@ export function buildGapRuns(args: BuildGapRunsArgs): GapRun[] {
         dateEnd: date,
         days: 1,
         classification: cls,
-        assignmentKey: key,
+        assignment: ref,
       };
       openIdx = d;
     }

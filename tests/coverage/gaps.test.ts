@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildGapRuns, classifyGapDay, gapTotals, matchesShipQuery, sortGapRuns } from "../../app/coverage/gaps";
+import {
+  actionsFor, buildAssignmentIndex, buildGapRuns, classifyGapDay, confirmText, gapTotals, inView,
+  matchesShipQuery, ownsDays, runState, snapshotAsOf, sortGapRuns, spanDays, visibleDays,
+  type AssignmentLike, type AssignmentRef, type GapRun,
+} from "../../app/coverage/gaps";
 import { covidWindow, eligibleDayIndices, mergedDayOutcome } from "../../app/coverage/kpis";
 import type { Row } from "../../app/coverage/rows";
 import type { Cell, Ship } from "../../app/coverage/types";
@@ -128,13 +132,14 @@ describe("buildGapRuns", () => {
   });
 
   it("splits a run when the assignment identity changes", () => {
+    const kim: AssignmentRef = { id: "a1", assignee: "kim", status: "in_progress", completedAt: "", dateStart: "2024-01-01", dateEnd: "2024-01-02" };
     const runs = buildGapRuns({
       ...base([review(), review(), review(), review()], [silverBad(), silverBad(), silverBad(), silverBad()]),
-      assignmentAt: (_r, date) => (date <= "2024-01-02" ? "kim|in_progress" : null),
+      assignmentAt: (_r, date) => (date <= "2024-01-02" ? kim : null),
     });
     expect(runs).toHaveLength(2);
-    expect(runs[0]).toMatchObject({ days: 2, assignmentKey: "kim|in_progress" });
-    expect(runs[1]).toMatchObject({ days: 2, assignmentKey: null });
+    expect(runs[0]).toMatchObject({ days: 2, assignment: { id: "a1" } });
+    expect(runs[1]).toMatchObject({ days: 2, assignment: null });
   });
 });
 
@@ -299,5 +304,203 @@ describe("date range", () => {
 
   it("is a no-op when no bounds are given", () => {
     expect(buildGapRuns(args())[0].days).toBe(10);
+  });
+});
+
+const assignment = (over: Partial<AssignmentLike> = {}): AssignmentLike => ({
+  id: "a1", ship_id: 1, ship_mmsi: 200000001, date_start: "2024-01-01", date_end: "2024-01-04",
+  assignee: "nick", status: "queued", completed_at: "", ...over,
+});
+const ref = (over: Partial<AssignmentRef> = {}): AssignmentRef => ({
+  id: "a1", assignee: "nick", status: "queued", completedAt: "", dateStart: "2024-01-01", dateEnd: "2024-01-04", ...over,
+});
+const runWith = (a: AssignmentRef | null, classification: "high" | "blackout" = "high") =>
+  ({ assignment: a, classification }) as Pick<GapRun, "assignment" | "classification">;
+const SNAP = "2026-09-28T10:00:00.000Z";
+
+describe("ownsDays", () => {
+  it("claims days for live statuses and new-flow done", () => {
+    expect(ownsDays({ status: "queued" })).toBe(true);
+    expect(ownsDays({ status: "blocked" })).toBe(true);
+    expect(ownsDays({ status: "done", completed_at: "2026-09-28T09:00:00.000Z" })).toBe(true);
+  });
+
+  // Cancelled = withdrawn; its days go back to the pool.
+  it("releases a cancelled assignment's days", () => {
+    expect(ownsDays({ status: "cancelled" })).toBe(false);
+  });
+
+  // The grandfathering guarantee: legacy done rows behave exactly as today,
+  // so their still-dirty days stay in the Unassigned queue at launch.
+  it("releases a legacy done assignment (blank completed_at)", () => {
+    expect(ownsDays({ status: "done", completed_at: "" })).toBe(false);
+    expect(ownsDays({ status: "done" })).toBe(false);
+  });
+
+  // Review focus 5: an empty status cell is "", not undefined.
+  it("treats a blank status cell as queued", () => {
+    expect(ownsDays({ status: "" })).toBe(true);
+  });
+});
+
+describe("buildAssignmentIndex", () => {
+  const rows = [row(ship())];
+
+  it("resolves a day inside an assignment to its ref", () => {
+    const at = buildAssignmentIndex(rows, [assignment()]);
+    expect(at(0, "2024-01-02")).toMatchObject({ id: "a1", assignee: "nick", status: "queued" });
+    expect(at(0, "2024-01-05")).toBeNull();
+  });
+
+  it("normalises a blank status to queued", () => {
+    expect(buildAssignmentIndex(rows, [assignment({ status: "" })])(0, "2024-01-01")?.status).toBe("queued");
+  });
+
+  it("skips cancelled and legacy done assignments", () => {
+    const at = buildAssignmentIndex(rows, [
+      assignment({ id: "c", status: "cancelled" }),
+      assignment({ id: "l", status: "done", completed_at: "" }),
+    ]);
+    expect(at(0, "2024-01-01")).toBeNull();
+  });
+
+  // The reappear bug: a completed assignment must keep owning its days.
+  it("keeps a new-flow done assignment owning its days", () => {
+    const at = buildAssignmentIndex(rows, [assignment({ status: "done", completed_at: SNAP })]);
+    expect(at(0, "2024-01-01")?.id).toBe("a1");
+  });
+
+  it("gives an overlapping day to the first assignment in sheet order", () => {
+    const at = buildAssignmentIndex(rows, [assignment({ id: "first" }), assignment({ id: "second" })]);
+    expect(at(0, "2024-01-02")?.id).toBe("first");
+  });
+
+  it("ignores an assignment for a ship not in the snapshot", () => {
+    const at = buildAssignmentIndex(rows, [assignment({ ship_id: 999, ship_mmsi: 999 })]);
+    expect(at(0, "2024-01-01")).toBeNull();
+  });
+});
+
+describe("buildGapRuns with assignment identity", () => {
+  // Decision 3: two adjacent assignments with the same assignee and status
+  // must stay two runs, or an action on one would silently hit the other.
+  it("never merges adjacent assignments with the same assignee and status", () => {
+    const at = buildAssignmentIndex([row(ship())], [
+      assignment({ id: "x", date_start: "2024-01-01", date_end: "2024-01-02" }),
+      assignment({ id: "y", date_start: "2024-01-03", date_end: "2024-01-04" }),
+    ]);
+    const runs = buildGapRuns({
+      rowIdxs: [0], rows: [row(ship())], dates: days(4),
+      voyageCells: [[review(), review(), review(), review()]],
+      silverCells: [[silverBad(), silverBad(), silverBad(), silverBad()]],
+      assignmentAt: at,
+    });
+    expect(runs.map(r => r.assignment?.id)).toEqual(["x", "y"]);
+  });
+});
+
+describe("runState", () => {
+  it("is unassigned without an assignment", () => {
+    expect(runState(runWith(null), SNAP)).toBe("unassigned");
+  });
+
+  it("is active for queued, in_progress and blocked", () => {
+    for (const status of ["queued", "in_progress", "blocked"]) {
+      expect(runState(runWith(ref({ status })), SNAP)).toBe("active");
+    }
+  });
+
+  // Completed after the snapshot read Postgres: the snapshot cannot know yet.
+  it("is awaiting_snapshot when completed after data_as_of", () => {
+    expect(runState(runWith(ref({ status: "done", completedAt: "2026-09-28T10:30:00.000Z" })), SNAP)).toBe("awaiting_snapshot");
+  });
+
+  // A snapshot taken after completion still shows this High day dirty.
+  it("is reopened when completed before data_as_of and still High", () => {
+    expect(runState(runWith(ref({ status: "done", completedAt: "2026-09-28T09:00:00.000Z" })), SNAP)).toBe("reopened");
+  });
+
+  // Blackout has no silver to clean, so it can never be "still dirty".
+  it("is done, never reopened, for Blackout under a done assignment", () => {
+    expect(runState(runWith(ref({ status: "done", completedAt: "2026-09-28T09:00:00.000Z" }), "blackout"), SNAP)).toBe("done");
+  });
+
+  // Review focus 2: Sheets can reformat a timestamp into something unparseable.
+  it("treats an unparseable completed_at as older than the snapshot", () => {
+    expect(runState(runWith(ref({ status: "done", completedAt: "28/09/2026 10:30" })), SNAP)).toBe("reopened");
+  });
+});
+
+describe("snapshotAsOf", () => {
+  it("prefers data_as_of", () => {
+    expect(snapshotAsOf({ data_as_of: "2026-09-28T10:00:00.000Z", generated_at: "2026-09-28T10:04:00.000Z" })).toBe("2026-09-28T10:00:00.000Z");
+  });
+
+  // Review focus 3: snapshots written before data_as_of existed.
+  it("falls back to generated_at on an older snapshot", () => {
+    expect(snapshotAsOf({ generated_at: "2026-09-28T10:04:00.000Z" })).toBe("2026-09-28T10:04:00.000Z");
+  });
+});
+
+describe("inView", () => {
+  const mine = runWith(ref({ assignee: "kim" }));
+  it("Unassigned shows only unassigned runs", () => {
+    expect(inView(runWith(null), "unassigned", "unassigned", "kim")).toBe(true);
+    expect(inView(mine, "active", "unassigned", "kim")).toBe(false);
+  });
+  it("My work shows runs assigned to the viewer, in any state", () => {
+    expect(inView(mine, "reopened", "mine", "kim")).toBe(true);
+    expect(inView(mine, "active", "mine", "nick")).toBe(false);
+    expect(inView(runWith(null), "unassigned", "mine", "")).toBe(false);
+  });
+  it("Reopened shows only reopened runs", () => {
+    expect(inView(mine, "reopened", "reopened", "kim")).toBe(true);
+    expect(inView(mine, "awaiting_snapshot", "reopened", "kim")).toBe(false);
+  });
+  it("All shows everything", () => {
+    expect(inView(runWith(null), "unassigned", "all", "")).toBe(true);
+  });
+});
+
+describe("actionsFor", () => {
+  // The spec's per-state action table.
+  it("matches the lifecycle table", () => {
+    expect(actionsFor("unassigned")).toEqual(["assign"]);
+    expect(actionsFor("active")).toEqual(["reassign", "unassign", "complete"]);
+    expect(actionsFor("awaiting_snapshot")).toEqual(["reassign", "unassign", "reopen"]);
+    expect(actionsFor("reopened")).toEqual(["reassign", "unassign", "reopen"]);
+    expect(actionsFor("done")).toEqual(["reopen"]);
+  });
+
+  // Awaiting runs must not be assignable — that is what stops the double-assign.
+  it("never offers assign on a run that already has an assignment", () => {
+    for (const s of ["active", "awaiting_snapshot", "reopened", "done"] as const) {
+      expect(actionsFor(s)).not.toContain("assign");
+    }
+  });
+});
+
+describe("full-assignment confirmation", () => {
+  it("counts the inclusive span of the whole assignment", () => {
+    expect(spanDays({ dateStart: "2024-01-01", dateEnd: "2024-06-30" })).toBe(182);
+    expect(spanDays({ dateStart: "2024-01-01", dateEnd: "2024-01-01" })).toBe(1);
+  });
+
+  it("counts only the visible days belonging to that assignment", () => {
+    const runs = [
+      { assignment: ref({ id: "a1" }), days: 3 },
+      { assignment: ref({ id: "a1" }), days: 2 },
+      { assignment: ref({ id: "b2" }), days: 9 },
+      { assignment: null, days: 4 },
+    ] as GapRun[];
+    expect(visibleDays("a1", runs)).toBe(5);
+  });
+
+  // Actions change the WHOLE assignment; the text must say so even when the
+  // clicked run is a small part of it.
+  it("states the full range, the change, and how much of it is in view", () => {
+    expect(confirmText({
+      verb: "Reassign", ref: ref({ dateStart: "2024-01-01", dateEnd: "2024-06-30" }), visible: 41, detail: "from Nick to Kim",
+    })).toBe("Reassign 2024-01-01 → 2024-06-30 (182 days) from Nick to Kim? 41 of those days are in this view.");
   });
 });

@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentContext";
 import { fetchWithRetry } from "@/app/coverage/CoverageLoader";
 import { indexPayload } from "@/app/coverage/indexPayload";
-import { buildGapRuns, gapTotals, matchesShipQuery, sortGapRuns, type GapRun } from "@/app/coverage/gaps";
+import { buildAssignmentIndex, buildGapRuns, gapTotals, matchesShipQuery, sortGapRuns, type GapRun } from "@/app/coverage/gaps";
 import { computeSilverKpis, type SilverKpis } from "@/app/coverage/kpis";
 import { ROSTER_GROUPS, isTeamRole } from "@/app/coverage/team";
 import type { CoveragePayload } from "@/app/coverage/types";
@@ -56,32 +56,11 @@ export default function GapsPage() {
 
   const indexed = useMemo(() => (payload ? indexPayload(payload) : null), [payload]);
 
-  // Ship-day -> assignment identity, so a run never spans an assignment boundary.
-  const assignmentAt = useMemo(() => {
-    if (!indexed) return undefined;
-    const byRow = new Map<number, { start: string; end: string; key: string }[]>();
-    const rowIdxByShipId = new Map<number, number>();
-    const rowIdxByMmsi = new Map<number, number>();
-    indexed.rows.forEach((row, i) => {
-      for (const m of row.members) rowIdxByShipId.set(m.id, i);
-      if (row.mmsi > 0 && !rowIdxByMmsi.has(row.mmsi)) rowIdxByMmsi.set(row.mmsi, i);
-    });
-    for (const a of drafts) {
-      if (!a.date_start || !a.date_end) continue;
-      if ((a.status ?? "queued") === "done") continue;
-      const ri = a.ship_id ? rowIdxByShipId.get(a.ship_id) : (a.ship_mmsi ? rowIdxByMmsi.get(a.ship_mmsi) : undefined);
-      if (ri === undefined) continue;
-      const list = byRow.get(ri) ?? [];
-      list.push({ start: a.date_start, end: a.date_end, key: `${a.assignee ?? ""}|${a.status ?? "queued"}` });
-      byRow.set(ri, list);
-    }
-    return (rowIdx: number, date: string): string | null => {
-      const list = byRow.get(rowIdx);
-      if (!list) return null;
-      for (const r of list) if (date >= r.start && date <= r.end) return r.key;
-      return null;
-    };
-  }, [indexed, drafts]);
+  // Ship-day -> owning assignment; runs split on assignment_id.
+  const assignmentAt = useMemo(
+    () => (indexed ? buildAssignmentIndex(indexed.rows, drafts) : undefined),
+    [indexed, drafts],
+  );
 
   const { high, blackout, totals, silver } = useMemo(() => {
     if (!indexed) return { high: [] as GapRun[], blackout: [] as GapRun[], totals: null, silver: null as SilverKpis | null };
@@ -114,8 +93,8 @@ export default function GapsPage() {
     if (dateTo) { while (to >= 0 && dates[to] > dateTo) to--; }
     const silverKpis = computeSilverKpis(rowIdxs, indexed.rows, dates, indexed.silver.cells, { from, to });
     const visible = (r: GapRun) =>
-      (!unassignedOnly || r.assignmentKey === null) &&
-      (!assignee || (r.assignmentKey ?? "").startsWith(`${assignee}|`));
+      (!unassignedOnly || r.assignment === null) &&
+      (!assignee || r.assignment?.assignee === assignee);
     return {
       high: runs.filter(r => r.classification === "high" && visible(r)),
       blackout: runs.filter(r => r.classification === "blackout"),
@@ -307,9 +286,9 @@ function RunTable({ runs, canAssign, busy, onAssign }: { runs: GapRun[]; canAssi
             <span style={{ color: C_INK_DIM, fontVariantNumeric: "tabular-nums" }}>{r.dateStart} → {r.dateEnd}</span>
             <span style={{ color: C_INK_FAINT, fontVariantNumeric: "tabular-nums", width: 52, textAlign: "right" }}>{r.days}d</span>
             <span style={{ width: 150, textAlign: "right", color: C_INK_FAINT, fontSize: 10.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {r.assignmentKey ? r.assignmentKey.replace("|", " · ") : ""}
+              {r.assignment ? `${r.assignment.assignee} · ${r.assignment.status}` : ""}
             </span>
-            {onAssign && canAssign && r.assignmentKey === null ? (
+            {onAssign && canAssign && r.assignment === null ? (
               <select
                 value=""
                 disabled={busy === key}
