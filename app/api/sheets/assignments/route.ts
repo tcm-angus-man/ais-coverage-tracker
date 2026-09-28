@@ -62,6 +62,7 @@ export async function POST(req: Request) {
       now,             // updated_at
       actor,           // updated_by
       d.ship_id,
+      "",               // completed_at
     ];
 
     const auditRow = [
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
 
     // Assignment write must succeed; audit failure is best-effort
     const [assignResult, auditResult] = await Promise.allSettled([
-      sheetsAppend("assignments!A:N", [assignmentRow]),
+      sheetsAppend("assignments!A:O", [assignmentRow]),
       sheetsAppend("audit_log!A:G",   [auditRow]),
     ]);
 

@@ -19,6 +19,10 @@ export const ASSIGNMENTS_COLUMNS = [
   "updated_at",
   "updated_by",
   "ship_id",
+  // Column O. Stamped server-side by PATCH when status moves into `done`,
+  // cleared when it leaves. Blank on a `done` row = legacy completion,
+  // grandfathered out of the awaiting/reopened lifecycle.
+  "completed_at",
 ] as const;
 
 export const AUDIT_LOG_COLUMNS = [

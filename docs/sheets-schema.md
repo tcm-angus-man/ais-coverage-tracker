@@ -15,12 +15,14 @@ Single workbook. Three tabs. Service account does all writes — clients never t
 | `date_start` | YYYY-MM-DD | |
 | `date_end` | YYYY-MM-DD | Inclusive |
 | `assignee` | slug | `team_config.slug` |
-| `status` | enum | `queued` \| `in_progress` \| `done` \| `blocked` |
+| `status` | enum | `queued` \| `in_progress` \| `done` \| `blocked` \| `cancelled` |
 | `notes` | string | Append-only. Each entry prefixed `[author @ ISO]\n` |
 | `updated_at` | ISO datetime | |
 | `updated_by` | slug | |
+| `ship_id` | integer | Authoritative ship key. Blank on legacy rows (resolved by `ship_mmsi`). |
+| `completed_at` | ISO datetime | Column O. Server-stamped when status moves into `done`; cleared when it leaves. Blank on a `done` row = legacy completion. |
 
-**Status transitions.** Cleaners may move `queued ↔ in_progress`, `in_progress → done`, `→ blocked`. `done` is terminal until an assigner reopens.
+**Status transitions.** Any active team member may set any status on any assignment. `cancelled` withdraws an assignment (soft delete; its days return to the pool) and appends an attributed `cancelled` note. The /gaps UI never moves an assignment out of `cancelled`. "Awaiting snapshot" and "reopened" are derived in the UI from `status`, `completed_at` and the snapshot's `data_as_of`; they are never stored.
 
 ## `team_config`
 

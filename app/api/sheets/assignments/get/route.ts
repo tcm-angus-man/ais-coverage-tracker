@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ ok: false, error: "unauthenticated" }, { status: 401 });
     }
 
-    const rows = await sheetsGet("assignments!A:N");
+    const rows = await sheetsGet("assignments!A:O");
     // Skip header row
     const data = rows.slice(1);
 
@@ -34,6 +34,7 @@ export async function GET() {
         notes:       row[ASSIGNMENTS_COLUMNS.indexOf("notes")]         ?? "",
         updated_at:  row[ASSIGNMENTS_COLUMNS.indexOf("updated_at")]    ?? "",
         updated_by:  row[ASSIGNMENTS_COLUMNS.indexOf("updated_by")]    ?? "",
+        completed_at: row[ASSIGNMENTS_COLUMNS.indexOf("completed_at")] ?? "",
       }));
 
     return NextResponse.json({ ok: true, assignments });
