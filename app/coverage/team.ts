@@ -41,3 +41,8 @@ export const ROSTER_GROUPS: RosterGroup[] = [
 export const ASSIGNABLE_MEMBERS: RosterMember[] = ROSTER_GROUPS.flatMap(g => g.members);
 
 export const LIVE_DATA_TEAM = new Set(ROSTER_GROUPS[0].members.map(m => m.slug));
+
+/** Client-side gate for assignment controls. The server also checks the member is active. */
+export function isTeamRole(role: string | undefined): boolean {
+  return role === "assigner" || role === "cleaner";
+}

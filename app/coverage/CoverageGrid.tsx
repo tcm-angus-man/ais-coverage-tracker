@@ -17,7 +17,7 @@ import { useAssignments } from "./AssignmentContext";
 import { SILVER_START } from "@/lib/snapshot/types";
 import { computeSilverKpis, covidWindow, eligibleDayIndices, mergedDayOutcome } from "./kpis";
 import { indexPayload, type Indexed } from "./indexPayload";
-import { ROSTER_GROUPS } from "./team";
+import { ROSTER_GROUPS, isTeamRole } from "./team";
 import {
   attributedShips,
   buildRows,
@@ -181,10 +181,9 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
   const { rows, dates, silverDates, silverDateOffset, voyage, silver, silverRowSet, cruiseLineList } = indexed;
   const { addDraft, drafts: assignments, reload: reloadAssignments } = useAssignments();
   const { data: session } = useSession();
-  const isAssigner = session?.user?.role === "assigner";
-  // Assignment creation is broader than the assigner role — cleaners carrying
-  // can_assign may create too. Editing others' assignments stays assigner-only.
-  const canAssign = isAssigner || session?.user?.can_assign === true;
+  // Any team member may create or edit any assignment (one permission rule,
+  // enforced server-side by lib/roles canAssign).
+  const canAssign = isTeamRole(session?.user?.role);
 
   const scrollRef    = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
@@ -1031,8 +1030,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
           ship={editModal.ship}
           dateStart={editModal.dateStart}
           dateEnd={editModal.dateEnd}
-          isAssigner={isAssigner}
-          currentSlug={session?.user?.slug ?? ""}
+          canEdit={canAssign}
           onSave={async (status, notes) => {
             const id = editModal.assignment.id;
             setEditModal(null);
@@ -1482,13 +1480,12 @@ const btnStyle: React.CSSProperties = { padding: "7px 18px", borderRadius: 3, fo
 const STATUS_OPTIONS = ["queued", "in_progress", "blocked", "done"] as const;
 type StatusOption = (typeof STATUS_OPTIONS)[number];
 
-function EditAssignmentModal({ assignment, ship, dateStart, dateEnd, isAssigner, currentSlug, onSave, onClose }: {
+function EditAssignmentModal({ assignment, ship, dateStart, dateEnd, canEdit, onSave, onClose }: {
   assignment: AssignmentInfo;
   ship: Ship;
   dateStart: string;
   dateEnd: string;
-  isAssigner: boolean;
-  currentSlug: string;
+  canEdit: boolean;
   onSave: (status: string, notes: string) => Promise<void>;
   onClose: () => void;
 }) {
@@ -1496,7 +1493,6 @@ function EditAssignmentModal({ assignment, ship, dateStart, dateEnd, isAssigner,
   const [notes, setNotes]   = useState(assignment.notes ?? "");
   const [saving, setSaving] = useState(false);
   const assigneeColor = ASSIGNEE_COLOR[assignment.assignee] ?? ASSIGNEE_COLOR_DEFAULT;
-  const canEdit = isAssigner || assignment.assignee === currentSlug;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1570,7 +1566,7 @@ function AssigneeFilterSelect({ assigneeFilter, setAssigneeFilter, session }: {
   setAssigneeFilter: (v: string) => void;
   session: ReturnType<typeof useSession>["data"];
 }) {
-  const canAssign = session?.user?.role === "assigner" || session?.user?.can_assign === true;
+  const canAssign = isTeamRole(session?.user?.role);
   const mySlug = session?.user?.slug ?? "";
 
   // The option list can't carry the assignee colour (options aren't styleable

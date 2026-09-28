@@ -7,7 +7,7 @@ import { fetchWithRetry } from "@/app/coverage/CoverageLoader";
 import { indexPayload } from "@/app/coverage/indexPayload";
 import { buildGapRuns, gapTotals, matchesShipQuery, sortGapRuns, type GapRun } from "@/app/coverage/gaps";
 import { computeSilverKpis, type SilverKpis } from "@/app/coverage/kpis";
-import { ROSTER_GROUPS } from "@/app/coverage/team";
+import { ROSTER_GROUPS, isTeamRole } from "@/app/coverage/team";
 import type { CoveragePayload } from "@/app/coverage/types";
 
 const C_BG        = "#0b1014";
@@ -42,7 +42,7 @@ export default function GapsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const canAssign = session?.user?.role === "assigner" || session?.user?.can_assign === true;
+  const canAssign = isTeamRole(session?.user?.role);
 
   useEffect(() => {
     const ac = new AbortController();

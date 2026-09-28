@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentContext";
-import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM } from "@/app/coverage/team";
+import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM, isTeamRole } from "@/app/coverage/team";
 
 type Status = "queued" | "in_progress" | "done" | "blocked";
 type Role = "assigner" | "cleaner" | "viewer";
@@ -62,6 +62,7 @@ export default function QueuePage() {
   }, []);
 
   const isAssigner = me?.role === "assigner";
+  const canEdit = isTeamRole(me?.role);
   const mySlug = me?.slug ?? null;
 
   // Derive unique assignees from loaded drafts (for filter pills), in roster
@@ -187,6 +188,7 @@ export default function QueuePage() {
           <DraftDetail
             draft={selDraft}
             isAssigner={isAssigner}
+            canEdit={canEdit}
             onClose={() => setSelected(null)}
             onStatusChange={handleStatusChange}
             onReload={reload}
@@ -256,9 +258,10 @@ function DraftRow({ draft, active, isAssigner, onClick, onStatusChange }: {
   );
 }
 
-function DraftDetail({ draft, isAssigner, onClose, onStatusChange, onReload }: {
+function DraftDetail({ draft, isAssigner, canEdit, onClose, onStatusChange, onReload }: {
   draft: DraftAssignment;
   isAssigner: boolean;
+  canEdit: boolean;
   onClose: () => void;
   onStatusChange: (id: string, status: Status) => void;
   onReload: () => void;
@@ -304,7 +307,7 @@ function DraftDetail({ draft, isAssigner, onClose, onStatusChange, onReload }: {
           {/* Status: admins get a dropdown, cleaners get advance button */}
           <div>
             <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginBottom: 6 }}>Status</div>
-            {isAssigner ? (
+            {canEdit ? (
               <select
                 value={status}
                 onChange={e => onStatusChange(draft.id, e.target.value as Status)}
@@ -336,7 +339,7 @@ function DraftDetail({ draft, isAssigner, onClose, onStatusChange, onReload }: {
         <div style={{ borderTop: `1px solid ${C_LINE}`, paddingTop: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT }}>Notes</div>
-            {isAssigner && !editingNotes && (
+            {canEdit && !editingNotes && (
               <button
                 onClick={() => setEditingNotes(true)}
                 style={{ fontSize: 9, color: C_INK_FAINT, background: "none", border: `1px solid ${C_LINE}`, borderRadius: 2, padding: "2px 8px", cursor: "pointer", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: "0.1em" }}
@@ -345,7 +348,7 @@ function DraftDetail({ draft, isAssigner, onClose, onStatusChange, onReload }: {
               </button>
             )}
           </div>
-          {isAssigner && editingNotes ? (
+          {canEdit && editingNotes ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <textarea
                 value={notes}

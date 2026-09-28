@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ ok: false, error: "unauthenticated" }, { status: 401 });
     }
-    // Assigners, plus cleaners carrying the can_assign capability
+    // Any active team member (lib/roles canAssign)
     if (!canAssign(session)) {
       return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM, ROSTER_GROUPS } from "../../app/coverage/team";
+import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM, ROSTER_GROUPS, isTeamRole } from "../../app/coverage/team";
 import { TEAM_MEMBERS, lookupTeamMember } from "../../lib/sheets/team-config";
 
 const slugs = (g: { members: { slug: string }[] }) => g.members.map(m => m.slug);
@@ -46,5 +46,16 @@ describe("assignee roster", () => {
 describe("departed members", () => {
   it.each(["jen", "jayziel"])("%s can no longer sign in", async slug => {
     expect(await lookupTeamMember(`${slug}@thecruisemaps.com`)).toBeNull();
+  });
+});
+
+describe("isTeamRole", () => {
+  // The client-side gate for every assignment control. Viewers are signed in
+  // on the domain but are not on the team.
+  it("is true for assigners and cleaners, false for viewers and missing roles", () => {
+    expect(isTeamRole("assigner")).toBe(true);
+    expect(isTeamRole("cleaner")).toBe(true);
+    expect(isTeamRole("viewer")).toBe(false);
+    expect(isTeamRole(undefined)).toBe(false);
   });
 });

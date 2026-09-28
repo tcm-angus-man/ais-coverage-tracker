@@ -6,7 +6,7 @@ Vitest. Run with `npm run test`. CI uses a containerised Postgres for the snapsh
 
 - **Snapshot SQL** against `tests/fixtures/snapshot.sql` (synthetic data). Verify shape, edge cases (zero-row ships, ships with prints but no silver, date-window boundaries).
 - **Zod schemas** for every Sheets tab — valid + invalid rows. Catch positional drift early.
-- **API route role gating.** Assigner-only routes reject cleaners. Cleaners can only PATCH assignments where `assignee === session.slug`.
+- **API route role gating.** Assignment routes (POST/PATCH) accept any active team member and reject viewers, unknown slugs and departed members (stale JWTs). Admin routes stay assigner-only.
 - **API route validation.** Bad UUIDs, bad date formats, bad status enums — all 400.
 
 ## What we don't test

@@ -26,13 +26,11 @@ export const authOptions: NextAuthOptions = {
           token.role = member.role;
           token.db_user_id = member.db_user_id;
           token.display_name = member.display_name;
-          token.can_assign = member.can_assign ?? false;
         } else {
           token.slug = null;
           token.role = "viewer";
           token.db_user_id = null;
           token.display_name = null;
-          token.can_assign = false;
         }
       }
       return token;
@@ -46,7 +44,6 @@ export const authOptions: NextAuthOptions = {
           "viewer",
         db_user_id: (token.db_user_id as string | null | undefined) ?? null,
         display_name: (token.display_name as string | null) ?? null,
-        can_assign: (token.can_assign as boolean | undefined) ?? false,
       };
       return session;
     },

@@ -1,3 +1,9 @@
+> **Superseded 2026-09-28.** `can_assign` was retired: any active team member
+> may now create or change any assignment (see
+> `docs/superpowers/specs/2026-09-28-gaps-assignment-lifecycle-design.md`).
+> The reasoning below about not promoting cleaners to `assigner` still holds —
+> `role` is unchanged and still guards the admin routes.
+
 # Granting assignment rights without granting the assigner role
 
 ## Problem

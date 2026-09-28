@@ -1,6 +1,7 @@
 import "server-only";
 import type { Session } from "next-auth";
 import type { Role } from "@/lib/types/session";
+import { TEAM_MEMBERS } from "@/lib/sheets/team-config";
 
 export class RoleError extends Error {
   status: number;
@@ -14,10 +15,15 @@ export function isAssigner(session: Session | null): boolean {
   return session?.user?.role === "assigner";
 }
 
-// Assignment creation. Assigners always qualify; cleaners only with the
-// can_assign capability. Does NOT imply admin-route access.
+// Assignment writes (POST and PATCH). Any active team member may create or
+// change any assignment. Checked per request against TEAM_MEMBERS because
+// sessions are JWTs: a departed member's token keeps its old role until it
+// expires. Does NOT imply admin-route access — that stays isAssigner.
 export function canAssign(session: Session | null): boolean {
-  return isAssigner(session) || session?.user?.can_assign === true;
+  const slug = session?.user?.slug;
+  const role = session?.user?.role;
+  if (!slug || (role !== "assigner" && role !== "cleaner")) return false;
+  return TEAM_MEMBERS.some(m => m.slug === slug && m.active);
 }
 
 export function isCleaner(session: Session | null): boolean {

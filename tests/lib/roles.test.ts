@@ -2,49 +2,45 @@ import { describe, expect, it } from "vitest";
 import type { Session } from "next-auth";
 import { canAssign, isAssigner } from "../../lib/roles";
 
-// canAssign is the gate on POST /api/sheets/assignments. It exists because
-// some cleaners hand out ship-days themselves, and we did NOT want to promote
-// them to "assigner" — that role also unlocks the admin routes and swaps the
-// queue page out of its cleaner affordances. If these two ever collapse back
-// into one check, that separation has been lost.
+// One rule for assignment writes: any ACTIVE team member may create or change
+// any assignment. Coordination is handled by Angus and Mon, not permissions.
+// The active check is per request because sessions are JWTs: a departed
+// member's existing token keeps its old role until it expires.
 function session(user: Partial<Session["user"]>): Session {
   return {
     expires: "2099-01-01T00:00:00.000Z",
-    user: {
-      slug: null,
-      role: "viewer",
-      db_user_id: null,
-      display_name: null,
-      can_assign: false,
-      ...user,
-    },
+    user: { slug: null, role: "viewer", db_user_id: null, display_name: null, ...user },
   } as Session;
 }
 
 describe("canAssign", () => {
-  it("allows assigners, who could already assign before can_assign existed", () => {
-    expect(canAssign(session({ role: "assigner", slug: "angus" }))).toBe(true);
+  it("allows an assigner", () => {
+    expect(canAssign(session({ role: "assigner", slug: "mon" }))).toBe(true);
   });
 
-  it("allows a cleaner carrying can_assign — the whole point of the flag", () => {
-    expect(canAssign(session({ role: "cleaner", slug: "nick", can_assign: true }))).toBe(true);
+  it("allows any cleaner — no per-person capability flag any more", () => {
+    expect(canAssign(session({ role: "cleaner", slug: "bea" }))).toBe(true);
   });
 
-  it("refuses a plain cleaner, so the flag is opt-in per person", () => {
-    expect(canAssign(session({ role: "cleaner", slug: "bea" }))).toBe(false);
+  it("refuses a departed member whose stale token still says cleaner", () => {
+    expect(canAssign(session({ role: "cleaner", slug: "jen" }))).toBe(false);
   });
 
-  it("refuses a viewer even if a stale token claims can_assign", () => {
-    expect(canAssign(session({ role: "viewer", can_assign: false }))).toBe(false);
+  it("refuses a viewer (signed in on the domain but not on the team)", () => {
+    expect(canAssign(session({ role: "viewer", slug: null }))).toBe(false);
+  });
+
+  it("refuses a slug that is not on the team at all", () => {
+    expect(canAssign(session({ role: "cleaner", slug: "nobody" }))).toBe(false);
   });
 
   it("refuses when there is no session", () => {
     expect(canAssign(null)).toBe(false);
   });
 
-  it("does not make a can_assign cleaner an assigner — admin routes stay shut", () => {
-    const nick = session({ role: "cleaner", slug: "nick", can_assign: true });
-    expect(canAssign(nick)).toBe(true);
-    expect(isAssigner(nick)).toBe(false);
+  // role=assigner still guards the admin and diag routes; widening assignment
+  // writes must not widen those.
+  it("does not make a cleaner an assigner", () => {
+    expect(isAssigner(session({ role: "cleaner", slug: "nick" }))).toBe(false);
   });
 });
