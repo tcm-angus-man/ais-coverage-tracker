@@ -17,6 +17,10 @@ export type DraftAssignment = {
   status?: string;
   notes?: string;
   created_by?: string;
+  updated_at?: string;
+  updated_by?: string;
+  /** Server-stamped when status moves into done; blank on legacy done rows. */
+  completed_at?: string;
 };
 
 type Ctx = {
@@ -24,6 +28,7 @@ type Ctx = {
   loading: boolean;
   addDraft: (d: DraftAssignment) => void;
   removeDraft: (id: string) => void;
+  updateDraft: (id: string, patch: Partial<DraftAssignment>) => void;
   reload: () => void;
 };
 
@@ -32,6 +37,7 @@ const AssignmentCtx = createContext<Ctx>({
   loading: false,
   addDraft: () => {},
   removeDraft: () => {},
+  updateDraft: () => {},
   reload: () => {},
 });
 
@@ -65,8 +71,13 @@ export function AssignmentProvider({ children }: { children: React.ReactNode }) 
     setDrafts(prev => prev.filter(x => x.id !== id));
   }, []);
 
+  // Apply the values the PATCH route reports it wrote (never guessed locally).
+  const updateDraft = useCallback((id: string, patch: Partial<DraftAssignment>) => {
+    setDrafts(prev => prev.map(x => (x.id === id ? { ...x, ...patch } : x)));
+  }, []);
+
   return (
-    <AssignmentCtx.Provider value={{ drafts, loading, addDraft, removeDraft, reload: load }}>
+    <AssignmentCtx.Provider value={{ drafts, loading, addDraft, removeDraft, updateDraft, reload: load }}>
       {children}
     </AssignmentCtx.Provider>
   );

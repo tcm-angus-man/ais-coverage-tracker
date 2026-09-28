@@ -244,7 +244,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
         : (a.ship_mmsi ? rowIdxByMmsi.get(a.ship_mmsi) : undefined);
       if (rowIdx === undefined) continue;
       const status = a.status ?? "queued";
-      if (status === "done") continue;
+      if (status === "done" || status === "cancelled") continue;
       const assignee = a.assignee ?? "";
       // Parse as UTC midnight to avoid DST shifts (e.g. Oct 31 / Mar 31 in GMT+1)
       const rawStart = new Date(a.date_start + "T00:00:00Z");
@@ -274,7 +274,7 @@ export default function CoverageGrid({ payload, mode }: { payload: CoveragePaylo
     if (!assigneeFilter) return null;
     const idx = new Set<number>();
     for (const a of assignments) {
-      if ((a.assignee ?? "") !== assigneeFilter || a.status === "done") continue;
+      if ((a.assignee ?? "") !== assigneeFilter || a.status === "done" || a.status === "cancelled") continue;
       const rowIdx = a.ship_id
         ? rowIdxByShipId.get(a.ship_id)
         : (a.ship_mmsi ? rowIdxByMmsi.get(a.ship_mmsi) : undefined);

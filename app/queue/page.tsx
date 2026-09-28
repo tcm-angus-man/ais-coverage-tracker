@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentContext";
 import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM, isTeamRole } from "@/app/coverage/team";
 
-type Status = "queued" | "in_progress" | "done" | "blocked";
+type Status = "queued" | "in_progress" | "done" | "blocked" | "cancelled";
 type Role = "assigner" | "cleaner" | "viewer";
 
 const STATUS_COLORS: Record<Status, string> = {
@@ -12,9 +12,10 @@ const STATUS_COLORS: Record<Status, string> = {
   in_progress: "#e8c170",
   done:        "#4ea374",
   blocked:     "#d35454",
+  cancelled:   "#5a6d7c",
 };
 const STATUS_LABEL: Record<Status, string> = {
-  queued: "Queued", in_progress: "In progress", done: "Done", blocked: "Blocked",
+  queued: "Queued", in_progress: "In progress", done: "Done", blocked: "Blocked", cancelled: "Cancelled",
 };
 const ALL_STATUSES: Status[] = ["queued", "in_progress", "done", "blocked"];
 
@@ -28,7 +29,7 @@ const C_INK_FAINT = "#5a6d7c";
 const C_ACCENT    = "#e8c170";
 
 function toStatus(s: string | undefined): Status {
-  if (s === "in_progress" || s === "done" || s === "blocked") return s;
+  if (s === "in_progress" || s === "done" || s === "blocked" || s === "cancelled") return s;
   return "queued";
 }
 
@@ -50,6 +51,8 @@ async function patchAssignment(id: string, patch: Record<string, string>) {
 
 export default function QueuePage() {
   const { drafts, loading, reload } = useAssignments();
+  // Cancelled assignments were withdrawn; they are nobody's work any more.
+  const liveDrafts = useMemo(() => drafts.filter(d => toStatus(d.status) !== "cancelled"), [drafts]);
   const [selected, setSelected] = useState<string | null>(null);
   const [me, setMe] = useState<{ role: Role; slug: string | null; display_name: string | null } | null>(null);
   const [filterSlug, setFilterSlug] = useState<string | null>(null);
@@ -70,18 +73,18 @@ export default function QueuePage() {
   // sort last, in first-seen order.
   const assigneeSlugs = useMemo(() => {
     const seen = new Set<string>();
-    for (const d of drafts) if (d.assignee) seen.add(d.assignee);
+    for (const d of liveDrafts) if (d.assignee) seen.add(d.assignee);
     const rank = (slug: string) => {
       const i = ASSIGNABLE_MEMBERS.findIndex(m => m.slug === slug);
       return i < 0 ? ASSIGNABLE_MEMBERS.length : i;
     };
     return [...seen].sort((a, b) => rank(a) - rank(b));
-  }, [drafts]);
+  }, [liveDrafts]);
 
   // Cleaners only see their own; assigners can filter by teammate
   const visibleDrafts = isAssigner
-    ? (filterSlug ? drafts.filter(d => d.assignee === filterSlug) : drafts)
-    : drafts.filter(d => d.assignee === mySlug);
+    ? (filterSlug ? liveDrafts.filter(d => d.assignee === filterSlug) : liveDrafts)
+    : liveDrafts.filter(d => d.assignee === mySlug);
 
   const active = visibleDrafts.filter(d => toStatus(d.status) !== "done");
   const done   = visibleDrafts.filter(d => toStatus(d.status) === "done");
@@ -136,7 +139,7 @@ export default function QueuePage() {
                 active={filterSlug === slug}
                 highlight={LIVE_DATA_TEAM.has(slug)}
                 onClick={() => setFilterSlug(prev => prev === slug ? null : slug)}
-                count={drafts.filter(d => d.assignee === slug && toStatus(d.status) !== "done").length}
+                count={liveDrafts.filter(d => d.assignee === slug && toStatus(d.status) !== "done").length}
               />
             ))}
           </div>
