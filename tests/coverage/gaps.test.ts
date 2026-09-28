@@ -139,17 +139,35 @@ describe("buildGapRuns", () => {
 });
 
 describe("sortGapRuns", () => {
-  it("puts actionable High work first, longest run first, and Blackout last", () => {
+  // The team works the most recent gaps first, so the worklist reads newest
+  // dateStart first — not longest first, which buried recent work under old
+  // multi-year runs.
+  it("orders runs by start date, newest first, regardless of length", () => {
     const runs = buildGapRuns({
       rowIdxs: [0],
       rows: [row(ship())],
       dates: days(8),
-      //       blackout x2         high x3 (dirty silver)          high x1
-      voyageCells: [[nothing(), nothing(), review(), review(), review(), done(), review(), done()]],
-      silverCells: [[null, null, silverBad(), silverBad(), silverBad(), null, silverBad(), null]],
+      //       high x3 (from 01-01)                   done    high x1 (01-05)  done   high x2 (01-07)
+      voyageCells: [[review(), review(), review(), done(), review(), done(), review(), review()]],
+      silverCells: [[silverBad(), silverBad(), silverBad(), null, silverBad(), null, silverBad(), silverBad()]],
     });
     const sorted = sortGapRuns(runs);
-    expect(sorted.map(r => `${r.classification}:${r.days}`)).toEqual(["high:3", "high:1", "blackout:2"]);
+    expect(sorted.map(r => `${r.dateStart}:${r.days}`)).toEqual([
+      "2024-01-07:2", "2024-01-05:1", "2024-01-01:3",
+    ]);
+  });
+
+  it("breaks a start-date tie by ship name", () => {
+    const a = ship({ id: 1, mmsi: 200000001, display_name: "Zeta" });
+    const b = ship({ id: 2, mmsi: 200000002, display_name: "Alpha" });
+    const runs = buildGapRuns({
+      rowIdxs: [0, 1],
+      rows: [row(a), row(b)],
+      dates: days(1),
+      voyageCells: [[review()], [review()]],
+      silverCells: [[silverBad()], [silverBad()]],
+    });
+    expect(sortGapRuns(runs).map(r => r.shipName)).toEqual(["Alpha", "Zeta"]);
   });
 });
 

@@ -169,18 +169,14 @@ export function buildGapRuns(args: BuildGapRunsArgs): GapRun[] {
 }
 
 /**
- * Operational order: actionable work first, longest run first within it, then
- * ship name. Blackout is not a priority tier — it sorts to the end so it can
- * never be mistaken for the top of the queue.
+ * Newest work first: start date descending, then ship name. High and Blackout
+ * render as separate tables, so classification no longer needs a rank here.
  */
 export function sortGapRuns(runs: GapRun[]): GapRun[] {
-  const rank = (c: GapClass) => (c === "high" ? 0 : 1);
   return [...runs].sort(
     (a, b) =>
-      rank(a.classification) - rank(b.classification) ||
-      b.days - a.days ||
-      a.shipName.localeCompare(b.shipName) ||
-      a.dateStart.localeCompare(b.dateStart),
+      b.dateStart.localeCompare(a.dateStart) ||
+      a.shipName.localeCompare(b.shipName),
   );
 }
 

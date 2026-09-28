@@ -17,7 +17,7 @@ import { useAssignments } from "./AssignmentContext";
 import { SILVER_START } from "@/lib/snapshot/types";
 import { computeSilverKpis, covidWindow, eligibleDayIndices, mergedDayOutcome } from "./kpis";
 import { indexPayload, type Indexed } from "./indexPayload";
-import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM } from "./team";
+import { ROSTER_GROUPS } from "./team";
 import {
   attributedShips,
   buildRows,
@@ -1402,9 +1402,9 @@ function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.12em", color: C_INK_FAINT }}>Assignee</label>
-          <div style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginTop: 2 }}>Live-data team</div>
+          <div style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginTop: 2 }}>{ROSTER_GROUPS[0].label}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-            {ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug)).map(m => {
+            {ROSTER_GROUPS[0].members.map(m => {
               const col = ASSIGNEE_COLOR[m.slug] ?? ASSIGNEE_COLOR_DEFAULT;
               const selected = assignee === m.slug;
               return (
@@ -1426,27 +1426,31 @@ function AssignModal({ ship, dateStart, dateEnd, onConfirm, onClose }: {
               );
             })}
           </div>
-          <div style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginTop: 6 }}>Other cleaners</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-            {ASSIGNABLE_MEMBERS.filter(m => !LIVE_DATA_TEAM.has(m.slug)).map(m => {
-              const selected = assignee === m.slug;
-              return (
-                <button
-                  key={m.slug}
-                  onClick={() => setAssignee(m.slug)}
-                  style={{
-                    padding: "4px 9px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
-                    fontSize: 10.5,
-                    border: `1px solid ${selected ? C_INK_DIM : C_LINE}`,
-                    background: selected ? C_PANEL : "transparent",
-                    color: selected ? C_INK : C_INK_FAINT,
-                  }}
-                >
-                  {m.display_name}
-                </button>
-              );
-            })}
-          </div>
+          {ROSTER_GROUPS.slice(1).map(g => (
+            <div key={g.label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: "0.14em", color: C_INK_FAINT, marginTop: 6 }}>{g.label}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                {g.members.map(m => {
+                  const selected = assignee === m.slug;
+                  return (
+                    <button
+                      key={m.slug}
+                      onClick={() => setAssignee(m.slug)}
+                      style={{
+                        padding: "4px 9px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+                        fontSize: 10.5,
+                        border: `1px solid ${selected ? C_INK_DIM : C_LINE}`,
+                        background: selected ? C_PANEL : "transparent",
+                        color: selected ? C_INK : C_INK_FAINT,
+                      }}
+                    >
+                      {m.display_name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <label style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.12em", color: C_INK_FAINT }}>Notes</label>
@@ -1569,9 +1573,6 @@ function AssigneeFilterSelect({ assigneeFilter, setAssigneeFilter, session }: {
   const canAssign = session?.user?.role === "assigner" || session?.user?.can_assign === true;
   const mySlug = session?.user?.slug ?? "";
 
-  const liveData = ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug));
-  const others   = ASSIGNABLE_MEMBERS.filter(m => !LIVE_DATA_TEAM.has(m.slug));
-
   // The option list can't carry the assignee colour (options aren't styleable
   // cross-browser), so the select itself takes it while a filter is active.
   const activeColor = assigneeFilter
@@ -1592,18 +1593,13 @@ function AssigneeFilterSelect({ assigneeFilter, setAssigneeFilter, session }: {
     >
       <option value="">All assignees</option>
       {canAssign ? (
-        <>
-          <optgroup label="Live data">
-            {liveData.map(m => (
+        ROSTER_GROUPS.map(g => (
+          <optgroup key={g.label} label={g.label}>
+            {g.members.map(m => (
               <option key={m.slug} value={m.slug}>{m.display_name}</option>
             ))}
           </optgroup>
-          <optgroup label="Team">
-            {others.map(m => (
-              <option key={m.slug} value={m.slug}>{m.display_name}</option>
-            ))}
-          </optgroup>
-        </>
+        ))
       ) : mySlug ? (
         <option value={mySlug}>Assigned to me</option>
       ) : null}

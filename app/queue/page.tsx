@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentContext";
+import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM } from "@/app/coverage/team";
 
 type Status = "queued" | "in_progress" | "done" | "blocked";
 type Role = "assigner" | "cleaner" | "viewer";
@@ -16,9 +17,6 @@ const STATUS_LABEL: Record<Status, string> = {
   queued: "Queued", in_progress: "In progress", done: "Done", blocked: "Blocked",
 };
 const ALL_STATUSES: Status[] = ["queued", "in_progress", "done", "blocked"];
-
-// Live-data team slugs — shown first and highlighted in the filter bar
-const LIVE_DATA_SLUGS = ["nick", "ai-ai", "kim"];
 
 const C_BG        = "#0b1014";
 const C_BG2       = "#0f161c";
@@ -66,19 +64,17 @@ export default function QueuePage() {
   const isAssigner = me?.role === "assigner";
   const mySlug = me?.slug ?? null;
 
-  // Derive unique assignees from loaded drafts (for filter pills)
+  // Derive unique assignees from loaded drafts (for filter pills), in roster
+  // order. Assignees no longer on the roster (departed members with old rows)
+  // sort last, in first-seen order.
   const assigneeSlugs = useMemo(() => {
     const seen = new Set<string>();
-    const liveFirst: string[] = [];
-    const rest: string[] = [];
-    for (const d of drafts) {
-      if (d.assignee && !seen.has(d.assignee)) {
-        seen.add(d.assignee);
-        if (LIVE_DATA_SLUGS.includes(d.assignee)) liveFirst.push(d.assignee);
-        else rest.push(d.assignee);
-      }
-    }
-    return [...liveFirst, ...rest];
+    for (const d of drafts) if (d.assignee) seen.add(d.assignee);
+    const rank = (slug: string) => {
+      const i = ASSIGNABLE_MEMBERS.findIndex(m => m.slug === slug);
+      return i < 0 ? ASSIGNABLE_MEMBERS.length : i;
+    };
+    return [...seen].sort((a, b) => rank(a) - rank(b));
   }, [drafts]);
 
   // Cleaners only see their own; assigners can filter by teammate
@@ -137,7 +133,7 @@ export default function QueuePage() {
                 key={slug}
                 label={slug.charAt(0).toUpperCase() + slug.slice(1)}
                 active={filterSlug === slug}
-                highlight={LIVE_DATA_SLUGS.includes(slug)}
+                highlight={LIVE_DATA_TEAM.has(slug)}
                 onClick={() => setFilterSlug(prev => prev === slug ? null : slug)}
                 count={drafts.filter(d => d.assignee === slug && toStatus(d.status) !== "done").length}
               />

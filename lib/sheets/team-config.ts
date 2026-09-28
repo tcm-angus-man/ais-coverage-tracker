@@ -28,12 +28,12 @@ export const TEAM_MEMBERS: TeamMember[] = [
   { slug: "kim",      display_name: "Kim",      db_user_id: "17", role: "cleaner",  active: true, can_assign: true },
   { slug: "nick",     display_name: "Nick",     db_user_id: "19", role: "cleaner",  active: true, can_assign: true },
   { slug: "nicole",   display_name: "Nicole",   db_user_id: "21", role: "cleaner",  active: true },
-  { slug: "jayziel",  display_name: "Jayziel",  db_user_id: "22", role: "cleaner",  active: true },
+  { slug: "jayziel",  display_name: "Jayziel",  db_user_id: "22", role: "cleaner",  active: false },
   { slug: "ai-ai",    display_name: "Ai-ai",    db_user_id: "23", role: "cleaner",  active: true, can_assign: true, email_local: "aiai" },
   { slug: "rome",     display_name: "Rome",     db_user_id: "26", role: "cleaner",  active: true, can_assign: true },
   { slug: "rich",     display_name: "Rich",     db_user_id: "28", role: "assigner", active: true },
   { slug: "dave",     display_name: "Dave",     db_user_id: "29", role: "cleaner",  active: true },
-  { slug: "jen",      display_name: "Jen",      db_user_id: "31", role: "cleaner",  active: true },
+  { slug: "jen",      display_name: "Jen",      db_user_id: "31", role: "cleaner",  active: false },
   { slug: "jovi",     display_name: "Jovi",     db_user_id: "37", role: "cleaner",  active: true },
 ];
 

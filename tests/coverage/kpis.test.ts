@@ -105,6 +105,22 @@ describe("computeSilverKpis", () => {
     expect(k.cleanedPct).toBe(60);         // of the data we hold
     expect(k.ingestedPct).toBe(33.3);      // of the hull's in-service life
   });
+
+  // /gaps shows this same figure under its date filter. The window must narrow
+  // the days counted rather than introduce a second cleanliness definition, so
+  // a windowed call equals an unwindowed call over just those days.
+  it("counts only days inside an optional date-index window", () => {
+    const dates = ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"];
+    const rows = [row(ship())];
+    const cells: (Cell | null)[][] = [[dirty(), clean(), dirty(), dirty()]];
+
+    const k = computeSilverKpis([0], rows, dates, cells, { from: 1, to: 2 });
+
+    expect(k.withData).toBe(2);
+    expect(k.needsReview).toBe(1);
+    expect(k.cleanedPct).toBe(50);
+    expect(k).toEqual(computeSilverKpis([0], rows, dates.slice(1, 3), [cells[0].slice(1, 3)]));
+  });
 });
 
 describe("mergedDayOutcome", () => {

@@ -42,14 +42,18 @@ export function computeSilverKpis(
   rows: Row[],
   dates: string[],
   cells: (Cell | null)[][],
+  /** Inclusive date-index bounds; the whole axis when omitted. /gaps passes its date filter here. */
+  window?: { from: number; to: number },
 ): SilverKpis {
+  const from = window ? Math.max(0, window.from) : 0;
+  const to = window ? Math.min(dates.length - 1, window.to) : dates.length - 1;
   let withData = 0;
   let needsReview = 0;
   let inServiceDays = 0;
   let withDataInService = 0;
 
   for (const si of rowIdxs) {
-    for (let di = 0; di < dates.length; di++) {
+    for (let di = from; di <= to; di++) {
       const inService = !rowIsOutOfService(rows[si], dates[di]);
       if (inService) inServiceDays++;
 

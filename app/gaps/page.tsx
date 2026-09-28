@@ -6,7 +6,8 @@ import { useAssignments, type DraftAssignment } from "@/app/coverage/AssignmentC
 import { fetchWithRetry } from "@/app/coverage/CoverageLoader";
 import { indexPayload } from "@/app/coverage/indexPayload";
 import { buildGapRuns, gapTotals, matchesShipQuery, sortGapRuns, type GapRun } from "@/app/coverage/gaps";
-import { ASSIGNABLE_MEMBERS, LIVE_DATA_TEAM } from "@/app/coverage/team";
+import { computeSilverKpis, type SilverKpis } from "@/app/coverage/kpis";
+import { ROSTER_GROUPS } from "@/app/coverage/team";
 import type { CoveragePayload } from "@/app/coverage/types";
 
 const C_BG        = "#0b1014";
@@ -19,6 +20,7 @@ const C_INK_FAINT = "#5a6d7c";
 const C_ACCENT    = "#e8c170";
 const C_HIGH      = "#e8c170";
 const C_BLACKOUT  = "#5a6d7c";
+const C_SILVER    = "#4ea374"; // the grid's C_SILVER_OK
 
 const dateStyle: React.CSSProperties = {
   background: C_PANEL, color: C_INK, border: `1px solid ${C_LINE}`,
@@ -81,8 +83,8 @@ export default function GapsPage() {
     };
   }, [indexed, drafts]);
 
-  const { high, blackout, totals } = useMemo(() => {
-    if (!indexed) return { high: [] as GapRun[], blackout: [] as GapRun[], totals: null };
+  const { high, blackout, totals, silver } = useMemo(() => {
+    if (!indexed) return { high: [] as GapRun[], blackout: [] as GapRun[], totals: null, silver: null as SilverKpis | null };
     // Tier and search narrow the ships; the date range narrows the days. Both
     // are applied before runs are built, so the totals below describe exactly
     // what is listed.
@@ -103,6 +105,14 @@ export default function GapsPage() {
       dateTo: dateTo || undefined,
     }));
     const t = gapTotals(runs);
+    // The Cleanliness tab's own calculation, narrowed by the same filters — one
+    // cleanliness definition across the product. It is not the High queue: a
+    // dirty silver day under a visible voyage is done in Merged, so never High.
+    const { dates } = indexed;
+    let from = 0, to = dates.length - 1;
+    if (dateFrom) { from = dates.findIndex(d => d >= dateFrom); if (from < 0) from = dates.length; }
+    if (dateTo) { while (to >= 0 && dates[to] > dateTo) to--; }
+    const silverKpis = computeSilverKpis(rowIdxs, indexed.rows, dates, indexed.silver.cells, { from, to });
     const visible = (r: GapRun) =>
       (!unassignedOnly || r.assignmentKey === null) &&
       (!assignee || (r.assignmentKey ?? "").startsWith(`${assignee}|`));
@@ -110,6 +120,7 @@ export default function GapsPage() {
       high: runs.filter(r => r.classification === "high" && visible(r)),
       blackout: runs.filter(r => r.classification === "blackout"),
       totals: t,
+      silver: silverKpis,
     };
   }, [indexed, assignmentAt, unassignedOnly, assignee, tiers, query, dateFrom, dateTo]);
 
@@ -119,7 +130,7 @@ export default function GapsPage() {
     return Array.from(s).sort();
   }, [drafts]);
 
-  // `who` is always a slug from ASSIGNABLE_MEMBERS — the same roster the grid's
+  // `who` is always a slug from ROSTER_GROUPS — the same roster the grid's
   // assign modal uses, so /gaps can't write an assignee the team doesn't have.
   async function assignRun(run: GapRun, who: string) {
     if (!who) return;
@@ -159,7 +170,7 @@ export default function GapsPage() {
   const filtered = query.trim() !== "" || tiers.size > 0 || dateFrom !== "" || dateTo !== "";
 
   if (error && !payload) return <Centered>Failed to load: {error}</Centered>;
-  if (!indexed || !totals) return <Centered>Loading coverage data…</Centered>;
+  if (!indexed || !totals || !silver) return <Centered>Loading coverage data…</Centered>;
 
   return (
     <div style={{ height: "100%", overflow: "auto", background: C_BG, color: C_INK }}>
@@ -216,6 +227,9 @@ export default function GapsPage() {
         <div style={{ display: "flex", gap: 28, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
           <Stat value={totals.highDays.toLocaleString()} label={`high days · ${totals.highRuns.toLocaleString()} runs`} color={C_HIGH} />
           <Stat value={totals.blackoutDays.toLocaleString()} label={`blackout days · ${totals.blackoutRuns.toLocaleString()} runs`} color={C_BLACKOUT} />
+          <div style={{ paddingLeft: 28, borderLeft: `1px solid ${C_LINE}` }} title="Same figure as the Cleanliness tab: silver ship-days with all four anomaly counts at zero. Not the High queue.">
+            <Stat value={`${silver.cleanedPct}%`} label={`silver cleanliness · ${(silver.withData - silver.needsReview).toLocaleString()} of ${silver.withData.toLocaleString()} ship-days clean`} color={C_SILVER} />
+          </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "center", fontSize: 11 }}>
             <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", color: C_INK_DIM }}>
               <input type="checkbox" checked={unassignedOnly} onChange={e => setUnassignedOnly(e.target.checked)} />
@@ -303,11 +317,12 @@ function RunTable({ runs, canAssign, busy, onAssign }: { runs: GapRun[]; canAssi
                 style={{ width: 96, padding: "2px 6px", fontSize: 10, cursor: "pointer", borderRadius: 2, border: `1px solid ${C_LINE}`, background: C_ACCENT, color: "#1a1207", fontWeight: 600, fontFamily: "inherit" }}
               >
                 <option value="">{busy === key ? "…" : "assign to…"}</option>
-                {ASSIGNABLE_MEMBERS.filter(m => LIVE_DATA_TEAM.has(m.slug)).map(m => (
-                  <option key={m.slug} value={m.slug}>{m.display_name}</option>
-                ))}
-                {ASSIGNABLE_MEMBERS.filter(m => !LIVE_DATA_TEAM.has(m.slug)).map(m => (
-                  <option key={m.slug} value={m.slug}>{m.display_name}</option>
+                {ROSTER_GROUPS.map(g => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.members.map(m => (
+                      <option key={m.slug} value={m.slug}>{m.display_name}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             ) : <span style={{ width: 96 }} />}
