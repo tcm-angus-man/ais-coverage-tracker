@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildSnapshot, endPool } from "@/lib/snapshot/build";
+import { buildSnapshotViaGateway } from "@/lib/gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,16 +22,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
+  // The Cruise Globe Dashboard gateway runs the Postgres queries and writes
+  // the Blob; this route only supplies the ship_metadata rows.
   try {
-    const result = await buildSnapshot();
+    const result = await buildSnapshotViaGateway();
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
     console.error("[cron/snapshot] failed", err);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
-  } finally {
-    // Best-effort. The lambda will be torn down anyway, but ending the pool
-    // keeps local script runs from leaving open connections.
-    await endPool().catch(() => undefined);
   }
 }

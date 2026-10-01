@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { getPool } from "@/lib/snapshot/db";
+import { gatewayFetch } from "@/lib/gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type GatewayDiag = {
+  total_rows: number;
+  human_touched_rows: number;
+  by_updated_by: { updated_by: string | null; count: number }[];
+  recent_human_touched: { mmsi: number; date: string; updated_by: string; updated_at: string }[];
+};
 
 // Admin-only diagnostic: counts how many silver rows would qualify as
 // human-touched, plus a few sample updated_by values, so we can verify the
@@ -16,36 +23,15 @@ export async function GET() {
   }
 
   try {
-    const pool = getPool();
-    const [totalRes, humanRes, byUserRes, sampleRes] = await Promise.all([
-      pool.query<{ count: string }>(`SELECT COUNT(*) AS count FROM ais_silver_summary`),
-      pool.query<{ count: string }>(`
-        SELECT COUNT(*) AS count
-        FROM ais_silver_summary
-        WHERE updated_by IS NOT NULL AND updated_by NOT IN ('data-platform')
-      `),
-      pool.query<{ updated_by: string | null; count: string }>(`
-        SELECT updated_by, COUNT(*) AS count
-        FROM ais_silver_summary
-        GROUP BY updated_by
-        ORDER BY count DESC
-        LIMIT 20
-      `),
-      pool.query<{ mmsi: number; date: string; updated_by: string; updated_at: string }>(`
-        SELECT mmsi, date::text, updated_by, updated_at::text
-        FROM ais_silver_summary
-        WHERE updated_by IS NOT NULL AND updated_by NOT IN ('data-platform')
-        ORDER BY updated_at DESC
-        LIMIT 5
-      `),
-    ]);
+    // The gateway runs the queries and returns this route's response shape.
+    const diag = await gatewayFetch<GatewayDiag>("ais/snapshot-diag");
 
     return NextResponse.json({
       ok: true,
-      total_rows: Number(totalRes.rows[0]?.count ?? 0),
-      human_touched_rows: Number(humanRes.rows[0]?.count ?? 0),
-      by_updated_by: byUserRes.rows.map(r => ({ updated_by: r.updated_by, count: Number(r.count) })),
-      recent_human_touched: sampleRes.rows,
+      total_rows: diag.total_rows,
+      human_touched_rows: diag.human_touched_rows,
+      by_updated_by: diag.by_updated_by,
+      recent_human_touched: diag.recent_human_touched,
     });
   } catch (err) {
     return NextResponse.json(

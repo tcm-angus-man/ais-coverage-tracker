@@ -29,7 +29,7 @@ Notes go to `learnings/<date>-<slug>.md` in the repo root.
 
 ## Architecture in one paragraph
 
-Postgres is the source of truth for ships, voyages, and silver cleaning. **This app never writes to Postgres.** An hourly Vercel Cron at `/api/cron/snapshot` regenerates a single brotli-compressed `coverage-latest.json` on Vercel Blob. Page renders never run live SQL. Google Sheets holds the mutable assignment + team-config + audit data; the service account does all writes from server routes.
+Postgres is the source of truth for ships, voyages, and silver cleaning. **This app never writes to Postgres, and on Vercel it no longer connects to it at all**: production RDS is IP-restricted, so every Postgres read goes through the Cruise Globe Dashboard gateway (`lib/gateway.ts`, `CRUISE_GATEWAY_URL` + `GATEWAY_TOKEN_AIS`). An hourly Vercel Cron at `/api/cron/snapshot` reads the `ship_metadata` sheet and POSTs it to `/api/gateway/ais/snapshot`; **the snapshot build — the Postgres queries and the Blob upload of the single brotli-compressed `coverage-latest.json` — now runs in the gateway**, and only the build summary comes back. `lib/snapshot/*` stays for local scripts run over VPN; nothing under `app/` may import `lib/snapshot/db`. Page renders never run live SQL. Google Sheets holds the mutable assignment + team-config + audit data; the service account does all writes from server routes.
 
 ## Key paths
 
