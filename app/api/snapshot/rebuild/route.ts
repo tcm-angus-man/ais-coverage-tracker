@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { buildSnapshot, endPool } from "@/lib/snapshot/build";
+import { buildSnapshotViaGateway } from "@/lib/gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 // Admin-triggered snapshot rebuild — same work as the hourly cron but
-// invoked manually by an assigner from the UI.
+// invoked manually by an assigner from the UI. The build itself runs in the
+// Cruise Globe Dashboard gateway.
 export async function POST() {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -19,7 +20,7 @@ export async function POST() {
   }
 
   try {
-    const result = await buildSnapshot();
+    const result = await buildSnapshotViaGateway();
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     console.error("[snapshot/rebuild] failed", err);
@@ -27,7 +28,5 @@ export async function POST() {
       { ok: false, error: err instanceof Error ? err.message : String(err) },
       { status: 500 },
     );
-  } finally {
-    await endPool().catch(() => undefined);
   }
 }

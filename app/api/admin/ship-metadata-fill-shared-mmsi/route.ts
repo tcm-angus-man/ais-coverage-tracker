@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { getPool } from "@/lib/snapshot/db";
+import { gatewayFetch } from "@/lib/gateway";
 import { sheetsGet, sheetsAppend } from "@/lib/sheets/client";
 
 export const runtime = "nodejs";
@@ -31,32 +31,12 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const apply = url.searchParams.get("apply") === "1";
 
-    // Pull every qualifying ship row from Postgres. Same filter as the new
-    // fetchShips: non-river-cruise, has mmsi, and has at least one undeleted
-    // globe-visible voyage OR appears in silver.
-    const pool = getPool();
-    const dbResult = await pool.query<{ mmsi: number; ship_name: string; cruise_line: string }>(`
-      SELECT
-        s.mmsi::int AS mmsi,
-        COALESCE(s.display_name, s.name, '')::text AS ship_name,
-        COALESCE(s.cruise_line, '')::text AS cruise_line
-      FROM ships s
-      WHERE s.is_river_cruise_ship = FALSE
-        AND s.mmsi IS NOT NULL
-        AND (
-          EXISTS (
-            SELECT 1 FROM voyages v
-            WHERE v.ship_id = s.id
-              AND v.is_deleted = FALSE
-              AND v.visible_on_globe = TRUE
-          )
-          OR EXISTS (
-            SELECT 1 FROM ais_silver_summary ass
-            WHERE ass.mmsi = s.mmsi
-          )
-        )
-      ORDER BY s.mmsi ASC, ship_name ASC
-    `);
+    // Pull every qualifying ship row from Postgres, via the gateway. Same
+    // filter as the new fetchShips: non-river-cruise, has mmsi, and has at
+    // least one undeleted globe-visible voyage OR appears in silver.
+    const dbResult = await gatewayFetch<{ rows: { mmsi: number; ship_name: string; cruise_line: string }[] }>(
+      "ais/shared-mmsi-ships",
+    );
 
     // Read current sheet. Columns: ship_name, cruise_line, mmsi, cruise_type,
     // service_start, service_end, tier.
