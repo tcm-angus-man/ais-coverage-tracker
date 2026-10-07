@@ -124,7 +124,7 @@ describe("GET /api/progress", () => {
       ],
       totals: { total_days: 10, clean_days: 6 },
       recent: [{ updated_by: "11", ship_name: "Ship A", mmsi: 200000001, date: "2026-09-30", updated_at: "2026-09-30 10:00:00" }],
-      today: [{ user_id: "99", count: 2, last_updated_at: "2026-10-01 08:00:00" }],
+      today: [{ user_id: "99", count: 2, historical: 1, live_data: 1, last_updated_at: "2026-10-01 08:00:00" }],
       today_hourly: [{ user_id: "11", hours: new Array(24).fill(0) }],
     });
 
@@ -136,7 +136,9 @@ describe("GET /api/progress", () => {
     expect(json.reviewers[1]).toMatchObject({ user_id: "99", display_name: "User 99", slug: "99" });
     expect(json.totals).toEqual({ total_days: 10, clean_days: 6 });
     expect(json.recent[0]).toMatchObject({ updated_by: "11", ship_name: "Ship A", display_name: "Bea" });
-    expect(json.today[0]).toEqual({ user_id: "99", display_name: "User 99", count: 2, last_updated_at: "2026-10-01 08:00:00" });
+    // historical / live_data split the count by the cleaned day's data date
+    // (older than 3 days vs. the last 3 days); the page shows both columns.
+    expect(json.today[0]).toEqual({ user_id: "99", display_name: "User 99", count: 2, historical: 1, live_data: 1, last_updated_at: "2026-10-01 08:00:00" });
     expect(json.today_hourly[0]).toMatchObject({ user_id: "11", display_name: "Bea", slug: "bea" });
     expect(json.today_hourly[0].hours).toHaveLength(24);
   });

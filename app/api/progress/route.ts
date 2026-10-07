@@ -15,7 +15,7 @@ type GatewayProgress = {
   reviewers: { user_id: string; days_cleaned: number; last_active: string; daily: DailyCount[]; daily30: DailyCount[] }[];
   totals: { total_days: number; clean_days: number };
   recent: { updated_by: string; ship_name: string | null; mmsi: number; date: string; updated_at: string }[];
-  today: { user_id: string; count: number; last_updated_at: string }[];
+  today: { user_id: string; count: number; historical: number; live_data: number; last_updated_at: string }[];
   today_hourly: { user_id: string; hours: number[] }[];
 };
 
@@ -56,6 +56,8 @@ export async function GET() {
         user_id:         r.user_id,
         display_name:    member?.display_name ?? `User ${r.user_id}`,
         count:           r.count,
+        historical:      r.historical,
+        live_data:       r.live_data,
         last_updated_at: r.last_updated_at,
       };
     });

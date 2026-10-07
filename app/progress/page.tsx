@@ -31,6 +31,8 @@ type TodayRow = {
   user_id:         string;
   display_name:    string;
   count:           number;
+  historical:      number; // data date older than 3 days
+  live_data:       number; // data date within the last 3 days
   last_updated_at: string;
 };
 
@@ -425,6 +427,8 @@ export default function ProgressPage() {
   });
 
   const todayTotal = data.today.reduce((s, r) => s + r.count, 0);
+  const todayHistorical = data.today.reduce((s, r) => s + r.historical, 0);
+  const todayLive = data.today.reduce((s, r) => s + r.live_data, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, background: C_BG, color: C_INK, overflow: "auto" }}>
@@ -545,6 +549,8 @@ export default function ProgressPage() {
                     <tr style={{ background: C_BG2 }}>
                       <th style={thStyle}>Mapmaker</th>
                       <th style={{ ...thStyle, textAlign: "right" }}>Days cleaned</th>
+                      <th style={{ ...thStyle, textAlign: "right" }} title="Data date older than 3 days">Historical</th>
+                      <th style={{ ...thStyle, textAlign: "right" }} title="Data date within the last 3 days">Live data</th>
                       <th style={{ ...thStyle, textAlign: "right" }}>Last update</th>
                     </tr>
                   </thead>
@@ -562,6 +568,12 @@ export default function ProgressPage() {
                           <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: C_CLEAN, fontWeight: 600 }}>
                             {row.count}
                           </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                            {row.historical}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                            {row.live_data}
+                          </td>
                           <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: C_INK_FAINT }}>
                             {row.last_updated_at.slice(11, 16)}
                           </td>
@@ -571,6 +583,8 @@ export default function ProgressPage() {
                     <tr style={{ borderTop: `1px solid ${C_LINE}`, background: C_BG2 }}>
                       <td style={{ ...tdStyle, color: C_INK_FAINT, fontWeight: 500 }}>Total</td>
                       <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: C_CLEAN }}>{todayTotal}</td>
+                      <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{todayHistorical}</td>
+                      <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{todayLive}</td>
                       <td style={tdStyle} />
                     </tr>
                   </tbody>
